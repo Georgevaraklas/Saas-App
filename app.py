@@ -1,4 +1,12 @@
 import os
+
+# Vercel serverless filesystem configuration
+os.environ["TMPDIR"] = "/tmp"
+os.environ["TEMP"] = "/tmp"
+os.environ["TMP"] = "/tmp"
+os.environ["PADDLE_HOME"] = "/tmp/paddle"
+os.environ["PADDLEX_HOME"] = "/tmp/paddlex"
+
 import uuid
 import tempfile
 import io

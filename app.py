@@ -17,7 +17,6 @@ from dotenv import load_dotenv
 from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, Blueprint, send_file, send_from_directory, abort, g
 from flask_limiter import Limiter
 from app_options import LANGUAGES, CURRENCIES, VALID_LANGUAGE_CODES, VALID_CURRENCY_CODES
-from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from PIL import Image, UnidentifiedImageError
@@ -75,7 +74,9 @@ register_currency_filter(app)
 
 # Configure session to use filesystem (instead of signed cookies)
 app.config["SESSION_PERMANENT"] = False
-app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 Session(app)
 
 # Configure PostgreSQL database (Supabase)

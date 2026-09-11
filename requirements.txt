@@ -1,0 +1,14 @@
+Flask
+psycopg2-binary
+python-dotenv
+Flask-Limiter
+Flask-Session
+Pillow
+pypdf
+requests
+python-magic
+pdf2image
+paddleocr
+numpy
+openpyxl
+reportlab

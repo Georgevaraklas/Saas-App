@@ -77,7 +77,6 @@ app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_COOKIE_SECURE"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-Session(app)
 
 # Configure PostgreSQL database (Supabase)
 # Put your Supabase PostgreSQL connection string in .env as DATABASE_URL.

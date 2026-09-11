@@ -1,0 +1,582 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Journal
+{% endblock %}
+
+{% block styles %}
+  <!-- Use nnorder.css for modal styling (same as new_order / products) -->
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Table styles (matching products.html) --- */
+
+    .journal-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .journal-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .journal-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .journal-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .journal-table-wrapper thead th:nth-child(1) { width: 18%; }
+    .journal-table-wrapper thead th:nth-child(2) { width: 22%; }
+    .journal-table-wrapper thead th:nth-child(3) { width: 60%; }
+
+    .journal-table-wrapper tbody td {
+      padding: 18px 24px;
+      font-size: 15px;
+      vertical-align: top;
+      border-bottom: 1px solid #eee;
+    }
+    .journal-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    /* Make rows clickable (pointer cursor) */
+    .journal-table-wrapper tbody tr.journal-row {
+      cursor: pointer;
+    }
+    .journal-table-wrapper tbody tr.journal-row:hover {
+      background: #fafafa;
+    }
+    .journal-table-wrapper .no-entries-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    /* Journal cell: clamp height, fade out overflowing text */
+    .journal-cell-inner {
+      max-height: 3.6em;
+      line-height: 1.2em;
+      overflow: hidden;
+      position: relative;
+      -webkit-mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+      mask-image: linear-gradient(to bottom, #000 65%, transparent 100%);
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* --- Top bar (copied from products.html / invoices.html) --- */
+    .inv-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .inv-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .btn-add-new {
+      padding: 12px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+
+    /* Enlarge the New/Edit Entry modals beyond nnorder.css defaults,
+       similar in scale to the "Add Product" modal on new_order.html */
+    #newEntryModal .modal-box,
+    #editEntryModal .modal-box {
+      max-width: 640px;
+      width: 90%;
+      padding: 36px 40px;
+    }
+
+    /* Enlarge the Journal textarea beyond nnorder.css defaults,
+       and make sure it matches the width of the Date/Location fields */
+    #newJournal,
+    #editJournal {
+      width: 100%;
+      max-width: 100%;
+      min-height: 280px;
+      resize: vertical;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+
+    .modal-actions-split {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .delete-btn {
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .delete-btn:hover {
+      background: #c82333;
+    }
+    .delete-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Override nnorder.css button primary color to black */
+    .btn-primary {
+      background: #111 !important;
+      color: #fff !important;
+      border: none !important;
+    }
+    .btn-primary:hover {
+      background: #333 !important;
+    }
+
+    /* =======================================================
+       Page shell — matches the redesigned header/card pattern
+       used on the Home, Stock, Order History, Products,
+       Recipes, Execution History, and Suppliers & Customers
+       pages, built on top of layout.html's design system.
+       ======================================================= */
+    .jrn-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .jrn-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .jrn-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .jrn-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing Add New */
+    .jrn-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .jrn-toolbar-card .inv-topbar {
+      margin-bottom: 0;
+    }
+    .jrn-toolbar-card .inv-topbar h2 {
+      display: none; /* replaced by .jrn-header h1 above */
+    }
+    .jrn-toolbar-card .inv-topbar-actions {
+      margin-left: 0;
+      width: 100%;
+      justify-content: flex-end;
+    }
+
+    .jrn-toolbar-card .btn-add-new {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      background: #1c1c1c !important;
+      color: #fff !important;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .jrn-toolbar-card .btn-add-new:hover {
+      background: #303030 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .jrn-toolbar-card .btn-add-new svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .jrn-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .jrn-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .jrn-toolbar-card .btn-add-new {
+        width: 100%;
+        justify-content: center;
+      }
+      .jrn-toolbar-card,
+      .jrn-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="jrn-wrap">
+
+  <div class="jrn-header">
+    <div>
+      <p class="greeting-eyebrow">Notes</p>
+      <h1>Journal</h1>
+    </div>
+  </div>
+
+  <div class="jrn-toolbar-card">
+    <div class="inv-topbar">
+      <h2>Journal</h2>
+      <div class="inv-topbar-actions">
+        <button class="btn-primary btn-add-new" id="openFormBtn" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+          Add New
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Entry Modal -->
+  <div class="modal-overlay" id="newEntryModal">
+    <div class="modal-box">
+      <h3>New Journal Entry</h3>
+      <form id="journalForm" action="/add_entry" method="POST">
+        <div class="form-group">
+          <label for="newDate">Date</label>
+          <input type="date" id="newDate" name="date" required>
+        </div>
+
+        <div class="form-group">
+          <label for="newLocation">Location</label>
+          <input type="text" id="newLocation" placeholder="Where were you?" name="location">
+        </div>
+
+        <div class="form-group">
+          <label for="newJournal">Journal</label>
+          <textarea id="newJournal" placeholder="Write about your day..." name="journal" rows="8"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelNewBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveNewBtn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Entry Modal -->
+  <div class="modal-overlay" id="editEntryModal">
+    <div class="modal-box">
+      <h3>Edit Journal Entry</h3>
+      <form id="editEntryForm">
+        <input type="hidden" id="editEntryId">
+        <div class="form-group">
+          <label for="editDate">Date</label>
+          <input type="date" id="editDate" required>
+        </div>
+
+        <div class="form-group">
+          <label for="editLocation">Location</label>
+          <input type="text" id="editLocation" placeholder="Location">
+        </div>
+
+        <div class="form-group">
+          <label for="editJournal">Journal</label>
+          <textarea id="editJournal" placeholder="Write about your day..." rows="8"></textarea>
+        </div>
+
+        <div class="modal-actions-split">
+          <button class="delete-btn" id="deleteEntryBtn" type="button">Delete</button>
+          <div class="modal-actions" style="margin-top:0;">
+            <button class="btn-secondary" id="cancelEditBtn" type="button">Cancel</button>
+            <button class="btn-primary" id="saveEditBtn" type="button">Save</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="jrn-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Entries</h2>
+      <span class="section-sub">{{ entries|length if entries else 0 }} total</span>
+    </div>
+    <div class="journal-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Location</th>
+          <th>Journal</th>
+        </tr>
+      </thead>
+      <tbody id="journalTableBody">
+        {% if entries %}
+          {% for entry in entries %}
+            <tr class="journal-row" data-entry-id="{{ entry['id'] if entry['id'] is defined else loop.index0 }}" data-date="{{ entry['date'] }}" data-location="{{ entry['location'] }}">
+              <td class="entry-date">{{ entry["date"] }}</td>
+              <td class="entry-location">{{ entry["location"] if entry["location"] is not none and entry["location"] != '' else '-' }}</td>
+              <td class="entry-journal">
+                <div class="journal-cell-inner">{{ entry["journal"] }}</div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-entries-row" id="no-entries-row">
+            <td colspan="3">No journal entries yet.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script>
+  // ---- Helper: today's date in YYYY-MM-DD for <input type="date"> ----
+  function todayISO() {
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - offset * 60 * 1000);
+    return local.toISOString().slice(0, 10);
+  }
+
+  // ---- New Entry Modal ----
+  const newModal = document.getElementById('newEntryModal');
+  const openNewBtn = document.getElementById('openFormBtn');
+  const cancelNewBtn = document.getElementById('cancelNewBtn');
+  const journalForm = document.getElementById('journalForm');
+  const newDateInput = document.getElementById('newDate');
+
+  openNewBtn.addEventListener('click', () => {
+    newDateInput.value = todayISO();
+    newModal.classList.add('open');
+    document.getElementById('newLocation').focus();
+  });
+
+  cancelNewBtn.addEventListener('click', () => {
+    newModal.classList.remove('open');
+  });
+
+  newModal.addEventListener('click', (e) => {
+    if (e.target === newModal) newModal.classList.remove('open');
+  });
+
+  // ---- Edit Entry Modal ----
+  const editModal = document.getElementById('editEntryModal');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const saveEditBtn = document.getElementById('saveEditBtn');
+  const deleteEntryBtn = document.getElementById('deleteEntryBtn');
+  const editId = document.getElementById('editEntryId');
+  const editDate = document.getElementById('editDate');
+  const editLocation = document.getElementById('editLocation');
+  const editJournal = document.getElementById('editJournal');
+
+  // Store current row reference for update
+  let currentEditRow = null;
+
+  function openEditModal(row) {
+    const entryId = row.dataset.entryId;
+    const date = row.dataset.date || row.querySelector('.entry-date').textContent.trim();
+    const locationText = row.querySelector('.entry-location').textContent.trim();
+    const location = locationText === '-' ? '' : locationText;
+    const journalText = row.querySelector('.journal-cell-inner').textContent.trim();
+
+    editId.value = entryId;
+    editDate.value = date;
+    editLocation.value = location;
+    editJournal.value = journalText;
+
+    currentEditRow = row;
+    editModal.classList.add('open');
+    editLocation.focus();
+  }
+
+  function closeEditModal() {
+    editModal.classList.remove('open');
+    currentEditRow = null;
+  }
+
+  cancelEditBtn.addEventListener('click', closeEditModal);
+  editModal.addEventListener('click', (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
+
+  // ---- Save Edit (AJAX) ----
+  saveEditBtn.addEventListener('click', async () => {
+    const entryId = editId.value;
+    const date = editDate.value;
+    const location = editLocation.value.trim();
+    const journal = editJournal.value.trim();
+
+    if (!date) {
+      alert('Please select a date.');
+      return;
+    }
+
+    saveEditBtn.disabled = true;
+    saveEditBtn.textContent = 'Saving…';
+
+    try {
+      const response = await fetch('/edit_entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entry_id: entryId, date, location, journal })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.message || 'Failed to update entry.');
+        return;
+      }
+
+      // Update row in table
+      if (currentEditRow) {
+        currentEditRow.querySelector('.entry-date').textContent = date;
+        currentEditRow.querySelector('.entry-location').textContent = location === '' ? '-' : location;
+        currentEditRow.querySelector('.journal-cell-inner').textContent = journal;
+        currentEditRow.dataset.date = date;
+        currentEditRow.dataset.location = location;
+      }
+
+      closeEditModal();
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while saving.');
+    } finally {
+      saveEditBtn.disabled = false;
+      saveEditBtn.textContent = 'Save';
+    }
+  });
+
+  // ---- Delete entry ----
+  deleteEntryBtn.addEventListener('click', () => {
+    const entryId = editId.value;
+
+    if (!confirm('Delete this journal entry? This cannot be undone.')) return;
+
+    deleteEntryBtn.disabled = true;
+
+    fetch('/delete_entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entry_id: entryId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to delete entry');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          if (currentEditRow) currentEditRow.remove();
+          toggleNoEntriesRow();
+          closeEditModal();
+        } else {
+          alert('Error: ' + (data.message || 'Could not delete entry.'));
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while deleting the entry.');
+      })
+      .finally(() => {
+        deleteEntryBtn.disabled = false;
+      });
+  });
+
+  // ---- Table row click: open edit modal ----
+  const journalTableBody = document.getElementById('journalTableBody');
+
+  journalTableBody.addEventListener('click', (e) => {
+    const row = e.target.closest('.journal-row');
+    if (row) {
+      openEditModal(row);
+    }
+  });
+
+  // ---- Toggle "no entries" row ----
+  function toggleNoEntriesRow() {
+    const hasRows = journalTableBody.querySelectorAll('tr.journal-row').length > 0;
+    let noRow = document.getElementById('no-entries-row');
+
+    if (!hasRows && !noRow) {
+      noRow = document.createElement('tr');
+      noRow.className = 'no-entries-row';
+      noRow.id = 'no-entries-row';
+      noRow.innerHTML = '<td colspan="3">No journal entries yet.</td>';
+      journalTableBody.appendChild(noRow);
+    } else if (hasRows && noRow) {
+      noRow.remove();
+    }
+  }
+</script>
+
+{% endblock %}

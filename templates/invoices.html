@@ -1,0 +1,3293 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Invoices
+{% endblock %}
+
+{% block styles %}
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Extra styles for the Invoices page (same pattern as Suppliers & Customers) --- */
+
+    /* Searchable dropdown (Customer field & Add Product modal) */
+    .customer-search {
+      position: relative;
+      width: 100%;
+    }
+    .customer-search-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .customer-search-results {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      z-index: 20;
+    }
+    .customer-search-results.open {
+      display: block;
+    }
+    .customer-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .customer-option:hover,
+    .customer-option.active {
+      background: #f2f2f2;
+    }
+    .customer-option.no-match {
+      cursor: default;
+      color: #888;
+      font-style: italic;
+    }
+    .customer-option.no-match:hover {
+      background: transparent;
+    }
+    .customer-option.hidden {
+      display: none;
+    }
+
+    .page.inv-page {
+      max-width: none;
+      width: 100%;
+      margin: 0;
+      box-sizing: border-box;
+    }
+
+    .inv-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .inv-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .btn-add-new {
+      padding: 12px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+
+    /* --- New "Scan With AI" button (purple) --- */
+    .btn-ai-scan {
+      padding: 12px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+      background: #6f42c1;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .btn-ai-scan:hover {
+      background: #5a32a3;
+    }
+
+    .inv-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .inv-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .inv-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .inv-sort-wrap select:focus {
+      border-color: #111;
+    }
+
+    .inv-search-wrap {
+      position: relative;
+      flex: 0 1 320px;
+    }
+    .inv-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .inv-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .inv-search-wrap .inv-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* Table, styled the same way as the Order History / Contacts table */
+    .inv-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .inv-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .inv-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .inv-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .inv-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .inv-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .inv-table-wrapper tbody tr:hover {
+      background: #fafafa;
+    }
+    .inv-table-wrapper .no-products-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .inv-table-wrapper .remove-btn {
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .inv-table-wrapper .remove-btn:hover {
+      background: #c82333;
+    }
+    .inv-table-wrapper .remove-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status-pill.paid {
+      background: #e6f6ea;
+      color: #1a7f37;
+    }
+    .status-pill.pending {
+      background: #fdf1e2;
+      color: #b8860b;
+    }
+
+    /* --- NEW: Pill styles for Invoice Type (copied from orderhistory.css) --- */
+    .received-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .received-pill.sales {
+      background: #e6f6ea;
+      color: #1a7f37;
+    }
+    .received-pill.purchase {
+      background: #eef1ff;
+      color: #3547d1;
+    }
+
+    /* --- New Invoice modal, styled the same way as the New Order form --- */
+    .modal-box.invoice-modal-box {
+      width: 720px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .form-section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      font-weight: 700;
+      margin: 0 0 14px;
+    }
+
+    /* Delete button in the Transfer Info modal footer */
+    .transfer-view-box .modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .transfer-view-box .modal-actions-right {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-danger {
+      background: #fff;
+      color: #d92d20;
+      border: 1px solid #f3a9a1;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .btn-danger:hover {
+      background: #d92d20;
+      color: #fff;
+      border-color: #d92d20;
+    }
+
+    .invoice-modal-box .field-row {
+      margin-bottom: 18px;
+    }
+    .invoice-modal-box .field-row.cols-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    /* Transfer Information trigger */
+    .transfer-field {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .transfer-field .mbtn.msecondary {
+      white-space: nowrap;
+    }
+    .transfer-status {
+      font-size: 13px;
+      color: #999;
+      font-style: italic;
+    }
+
+    .invoice-modal-box hr {
+      margin: 20px 0;
+    }
+
+    /* Nested Transfer Information modal sits above the invoice modal */
+    .modal-overlay.transfer-overlay {
+      z-index: 200;
+    }
+    .modal-box.transfer-modal-box {
+      width: 560px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .transfer-modal-box .field-row {
+      margin-bottom: 16px;
+    }
+    .transfer-modal-box .field-row.cols-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .transfer-modal-box .field-row.cols-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .transfer-modal-box .field-row.cols-4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .transfer-modal-box hr {
+      margin: 18px 0;
+    }
+    .transfer-modal-box .form-section-title {
+      margin-top: 4px;
+    }
+
+    /* --- "Add More" side-by-side layout ---------------------------------
+       When "Add More" is clicked from the read-only Transfer Info view,
+       the Add Transfer Info form is moved into the same overlay, right
+       next to the view box, instead of replacing it. Only this flow adds
+       the "side-by-side" class - the normal "+" button still opens a
+       plain, centered Add Transfer Info modal on its own. */
+    .modal-overlay.side-by-side {
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 24px;
+      overflow: auto;
+      padding: 40px 20px;
+    }
+    .modal-overlay.side-by-side .modal-box {
+      flex-shrink: 0;
+    }
+    /* Only the newly-added Add Transfer Info box fades/slides in here -
+       scoped to .transfer-modal-box specifically (not the generic
+       .modal-box every box shares) so the existing, already-visible view
+       box is never touched by this and can't get caught starting from
+       opacity: 0 too. */
+    .modal-overlay.side-by-side .transfer-modal-box {
+      opacity: 0;
+      transform: translateX(-16px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .modal-overlay.side-by-side .transfer-modal-box.side-by-side-in {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* --- Inline editable cells in the invoices table (same pattern as Stock) --- */
+    .editable-cell {
+      cursor: text;
+      border-radius: 4px;
+      transition: background 0.15s ease;
+    }
+    .editable-cell:hover {
+      background: #e8f4fd;
+    }
+    .editable-cell.editing {
+      background: #fff;
+      padding: 0 !important;
+    }
+    .editable-cell input,
+    .editable-cell select {
+      width: 100%;
+      padding: 20px 24px;
+      font-size: 15px;
+      font-family: inherit;
+      border: 2px solid #0b1215;
+      border-radius: 4px;
+      outline: none;
+      background: #fff;
+      box-sizing: border-box;
+    }
+    .editable-cell input:focus,
+    .editable-cell select:focus {
+      border-color: #0b1215;
+    }
+
+    /* --- Invoice Details view modal (read-only, no transfer details) --- */
+    .modal-box.invoice-view-box {
+      width: 680px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .invoice-view-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 20px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .invoice-view-meta div span.label {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .invoice-view-meta div span.value {
+      font-size: 14px;
+      color: #111;
+    }
+    .invoice-view-box hr {
+      margin: 18px 0;
+    }
+    .invoice-view-box .table-wrapper {
+      box-shadow: none;
+      border: 1px solid #eee;
+    }
+
+    /* --- Preview action buttons (eye / PDF) --- */
+    .inv-preview-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .icon-square-btn {
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .icon-square-btn:hover {
+      background: #f0f0f0;
+      border-color: #ccc;
+    }
+    .icon-square-btn svg {
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+    }
+    .view-info-btn {
+      font-size: 12px;
+      background: #3547d1;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .view-info-btn:hover {
+      background: #2a38a8;
+    }
+    .no-transfer-text {
+      color: #999;
+      font-style: italic;
+      font-size: 14px;
+    }
+    .add-transfer-btn {
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 6px;
+      background: #3547d1;
+      color: #fff;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.15s ease;
+    }
+    .add-transfer-btn:hover {
+      background: #2a38a8;
+    }
+    .add-transfer-btn svg {
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+    }
+
+    /* --- Transfer Info view modal (read-only) --- */
+    .modal-box.transfer-view-box {
+      width: 480px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    /* One block per saved transfer entry - an order can have several now,
+       so each gets its own header (with a per-entry Delete button) and a
+       divider from the entry before it. */
+    #transfer-view-entries {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .transfer-view-entry:not(:first-child) {
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+    .transfer-view-entry-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .transfer-view-entry-header h4 {
+      margin: 0;
+    }
+    .transfer-view-entry-delete {
+      padding: 4px 12px;
+      font-size: 12px;
+    }
+    .transfer-view-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 20px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .transfer-view-meta div span.label {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .transfer-view-meta div span.value {
+      font-size: 14px;
+      color: #111;
+    }
+    .transfer-view-box hr {
+      margin: 18px 0;
+    }
+
+    /* --- Scan with AI Modal & Drop Overlay --- */
+    /* Drop overlay (full screen blur) */
+    .drop-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(5px);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none; /* allow drop events to pass through? Actually we want to capture them */
+      pointer-events: auto;
+      color: #fff;
+      font-size: 28px;
+      font-weight: 600;
+      text-align: center;
+      flex-direction: column;
+    }
+    .drop-overlay.active {
+      display: flex;
+    }
+    .drop-overlay .drop-text {
+      background: rgba(255, 255, 255, 0.15);
+      padding: 30px 50px;
+      border-radius: 16px;
+      border: 3px dashed rgba(255, 255, 255, 0.5);
+    }
+    .drop-overlay .drop-text small {
+      display: block;
+      font-size: 16px;
+      font-weight: 400;
+      margin-top: 10px;
+      opacity: 0.8;
+    }
+
+    /* Scan AI modal */
+    .modal-box.scan-ai-box {
+      width: 500px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      text-align: center;
+    }
+    .scan-ai-box .drop-zone {
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      padding: 40px 20px;
+      margin: 20px 0;
+      transition: background 0.15s ease;
+      cursor: pointer;
+    }
+    .scan-ai-box .drop-zone.dragover {
+      background: #f0f0ff;
+      border-color: #6f42c1;
+    }
+    .scan-ai-box .drop-zone p {
+      margin: 0;
+      font-size: 14px;
+      color: #666;
+    }
+    .scan-ai-box .drop-zone .file-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+      color: #6f42c1;
+    }
+    .scan-ai-box .drop-zone input[type="file"] {
+      display: none;
+    }
+    .scan-ai-box .file-info {
+      margin: 10px 0;
+      font-size: 14px;
+      color: #333;
+      background: #f5f5f5;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+    .scan-ai-box .modal-actions {
+      margin-top: 20px;
+    }
+    .scan-ai-box .scan-progress-wrap {
+      margin: 16px 0 4px;
+      text-align: left;
+    }
+    .scan-ai-box .scan-progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 6px;
+    }
+    .scan-ai-box .scan-progress-track {
+      width: 100%;
+      height: 8px;
+      background: #eee;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .scan-ai-box .scan-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #6f42c1, #8f6fd6);
+      border-radius: 999px;
+      transition: width 0.2s linear;
+    }
+
+    /* --- Scan Confirmation Modal (Order-History style) --- */
+    .modal-box.scan-confirm-box {
+      width: 640px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .scan-confirm-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px 20px;
+      margin-bottom: 18px;
+      font-size: 13px;
+    }
+    .scan-confirm-meta div span.label {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .scan-confirm-meta div span.value {
+      font-size: 14px;
+      color: #111;
+    }
+    .scan-confirm-box .table-wrapper {
+      box-shadow: none;
+      border: 1px solid #eee;
+      margin-bottom: 10px;
+    }
+    .scan-confirm-box table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .scan-confirm-box thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .scan-confirm-box thead th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .scan-confirm-box tbody td {
+      padding: 10px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid #eee;
+    }
+    .scan-confirm-total {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      font-size: 14px;
+      margin: 6px 0 20px;
+    }
+    .scan-confirm-total b {
+      font-size: 16px;
+    }
+
+    /* --- Click-to-edit fields inside the Scan Confirmation modal --- */
+    .scan-confirm-meta .scan-field {
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 4px 6px;
+      margin: -4px -6px;
+      transition: background 0.15s ease;
+    }
+    .scan-confirm-meta .scan-field:hover {
+      background: #f0f0ff;
+    }
+    .scan-confirm-meta .scan-field.editing {
+      background: #fff;
+      cursor: default;
+    }
+    .scan-confirm-meta .value-display {
+      display: block;
+      font-size: 14px;
+      color: #111;
+      min-height: 20px;
+    }
+    .scan-confirm-meta .value-display.placeholder {
+      color: #999;
+      font-style: italic;
+    }
+    .scan-confirm-meta .value-input {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 14px;
+      font-family: inherit;
+      border: 2px solid #0b1215;
+      border-radius: 4px;
+      outline: none;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    .scan-confirm-box td.scan-cell {
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background 0.15s ease;
+    }
+    .scan-confirm-box td.scan-cell:hover {
+      background: #f0f0ff;
+    }
+    .scan-confirm-box td.scan-cell.editing {
+      background: #fff;
+      padding: 4px !important;
+    }
+    .scan-confirm-box td.scan-cell .value-display {
+      display: block;
+      padding: 4px 2px;
+      min-height: 18px;
+      font-size: 13px;
+    }
+    .scan-confirm-box td.scan-cell .value-display.placeholder {
+      display: inline-block;
+      color: #999;
+      font-style: normal;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 3px 10px;
+    }
+    .scan-confirm-box td.scan-cell .value-input {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 13px;
+      font-family: inherit;
+      border: 2px solid #0b1215;
+      border-radius: 4px;
+      outline: none;
+      box-sizing: border-box;
+      background: #fff;
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="page inv-page">
+
+  <br><br>
+
+  <div class="inv-topbar">
+    <h2>Invoices</h2>
+    <div class="inv-topbar-actions">
+      <!-- New "Scan With AI" button (purple) -->
+      <button class="btn-ai-scan" id="openAIScanBtn" type="button">Scan With AI</button>
+      <button class="btn-primary btn-add-new" id="openFormBtn" type="button">Add New</button>
+      <div class="inv-sort-wrap">
+        <label for="inv-sort-select">Sort By</label>
+        <select id="inv-sort-select">
+          <option value="issue_date_desc" selected>Issue Date (Newest First)</option>
+          <option value="issue_date_asc">Issue Date (Oldest First)</option>
+          <option value="date_desc">Date (Newest First)</option>
+          <option value="date_asc">Date (Oldest First)</option>
+          <option value="name_asc">Contact Name (A–Z)</option>
+          <option value="name_desc">Contact Name (Z–A)</option>
+          <option value="total_desc">Total (High to Low)</option>
+          <option value="total_asc">Total (Low to High)</option>
+        </select>
+      </div>
+      <div class="inv-search-wrap">
+        <span class="inv-search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+</svg></span>
+        <input type="text" id="inv-search-input" placeholder="Search invoices...">
+      </div>
+    </div>
+  </div>
+
+  <br>
+
+  <div class="inv-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Invoice No.</th>
+          <th>Accounting Document</th>
+          <th>Contact</th>
+          <th>Invoice Type</th>   <!-- NEW column header -->
+          <th>Total</th>
+          <th>Status</th>
+          <th>Issue Date</th>
+          <th>Transfer Info</th>
+          <th>Actions</th>
+          <th>Preview</th>
+        </tr>
+      </thead>
+      <tbody id="invoicesTableBody">
+        {% if invoices %}
+          {% for invoice in invoices %}
+            <tr class="inv-row" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}" data-date="{{ invoice['date'] }}" data-customer="{{ invoice['customer_name'] }}" data-total="{{ invoice['total'] if invoice['total'] is defined else 0 }}" data-issue-date="{{ invoice['issue_date'] }}">
+              <td class="editable-cell" data-field="date" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}">{{ invoice["date"] }}</td>
+              <td>{{ invoice["invoice_number"] }}</td>
+              <td>{{ invoice["doc_number"] }}</td>
+              <td class="product-name">{{ invoice["customer_name"] }}</td>
+              <td>
+                {% if invoice.receive in [1, '1', true] %}
+                  <span class="received-pill purchase">Purchase Invoice</span>
+                {% else %}
+                  <span class="received-pill sales">Sales Invoice</span>
+                {% endif %}
+              </td>   <!-- NEW pill -->
+              <td>{{ invoice["total"] | currency(account.currency if account else 'USD') }}</td>
+              <td class="editable-cell" data-field="status" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}">
+                {% if invoice["status"] == "Paid" %}
+                  <span class="status-pill paid">{{ invoice["status"] }}</span>
+                {% else %}
+                  <span class="status-pill pending">{{ invoice["status"] }}</span>
+                {% endif %}
+              </td>
+              <td class="editable-cell" data-field="issue_date" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}">{{ invoice["issue_date"] }}</td>
+              <td>
+                {% if invoice["transfer_infos"] %}
+                  <button type="button" class="view-info-btn" data-oid="{{ invoice['oid'] }}">View Info</button>
+                {% else %}
+                  <button type="button" class="add-transfer-btn" data-oid="{{ invoice['oid'] }}" title="Add Transfer Info">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M8 0a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2H9v6a1 1 0 1 1-2 0V9H1a1 1 0 0 1 0-2h6V1a1 1 0 0 1 1-1z"/>
+                    </svg>
+                  </button>
+                {% endif %}
+              </td>
+              <td>
+                <button type="button" class="remove-btn" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}">Remove</button>
+              </td>
+              <td>
+                <div class="inv-preview-actions">
+                  <button type="button" class="icon-square-btn view-invoice-btn" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}" title="View">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                      <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+                    </svg>
+                  </button>
+                  <button type="button" class="icon-square-btn pdf-invoice-btn" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}" title="PDF">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round">
+                      <path d="M3 1.5h5.5L13 6v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1z"/>
+                      <path d="M8.5 1.5V6H13"/>
+                      <text x="8" y="12.5" font-size="4.6" font-family="Arial, sans-serif" font-weight="700" text-anchor="middle" fill="currentColor" stroke="none">PDF</text>
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-products-row">
+            <td colspan="11">No invoices available.</td>   <!-- colspan updated to 11 -->
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <script type="application/json" id="invoices-data">{{ invoices | default([]) | tojson }}</script>
+  <script type="application/json" id="company-data">{{ company | default({}) | tojson }}</script>
+
+  <!-- Invoice Details view modal (read-only, everything except transfer info) -->
+  <div class="modal-overlay" id="invoice-view-overlay">
+    <div class="modal-box invoice-view-box">
+      <h3>Invoice Details</h3>
+
+      <h4 class="form-section-title">Invoice Information</h4>
+      <div class="invoice-view-meta" id="invoice-view-info">
+        <!-- filled in by JS -->
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Products</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Price</th>
+              <th>LOT Number</th>
+              <th>Quantity</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody id="invoice-view-products-body">
+            <!-- filled in by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="invoiceViewCloseBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Info view modal (read-only, shows saved transfer info for an existing invoice) -->
+  <div class="modal-overlay" id="transfer-view-overlay">
+    <div class="modal-box transfer-view-box">
+      <h3>Transfer Information</h3>
+
+      <!-- An order can have multiple transfer entries now; JS renders one
+           .transfer-view-entry block per entry here, each with its own
+           Loading/Destination/Transport sections and Delete button. -->
+      <div id="transfer-view-entries">
+        <!-- filled in by JS -->
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="transferViewAddMoreBtn" type="button">Add More</button>
+        <button class="btn-secondary" id="transferViewCloseBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Transfer Info modal (for an existing invoice that has none yet) -->
+  <div class="modal-overlay" id="add-transfer-overlay">
+    <div class="modal-box transfer-modal-box">
+      <h3>Transfer Information</h3>
+
+      <h4 class="form-section-title">Loading Location</h4>
+      <div class="field-row cols-3">
+        <div class="field">
+          <label for="AddTILoadingAddress">Address</label>
+          <input type="text" id="AddTILoadingAddress" placeholder="Address">
+        </div>
+        <div class="field">
+          <label for="AddTILoadingCity">City</label>
+          <input type="text" id="AddTILoadingCity" placeholder="City">
+        </div>
+        <div class="field">
+          <label for="AddTILoadingPostalCode">Postal Code</label>
+          <input type="text" id="AddTILoadingPostalCode" placeholder="Postal Code">
+        </div>
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Place of Destination</h4>
+      <div class="field-row cols-4">
+        <div class="field">
+          <label for="AddTIDestinationAddress">Address</label>
+          <input type="text" id="AddTIDestinationAddress" placeholder="Address">
+        </div>
+        <div class="field">
+          <label for="AddTIDestinationCity">City</label>
+          <input type="text" id="AddTIDestinationCity" placeholder="City">
+        </div>
+        <div class="field">
+          <label for="AddTIDestinationPostalCode">Postal Code</label>
+          <input type="text" id="AddTIDestinationPostalCode" placeholder="Postal Code">
+        </div>
+        <div class="field">
+          <label for="AddTIDestinationCountry">Country</label>
+          <input type="text" id="AddTIDestinationCountry" placeholder="Country">
+        </div>
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Mode of Transport</h4>
+      <div class="field-row cols-2">
+        <div class="field">
+          <label for="AddTITransportCompany">Transport Company</label>
+          <input type="text" id="AddTITransportCompany" placeholder="Transport Company">
+        </div>
+        <div class="field">
+          <label for="AddTITransportNumber">Transport Number</label>
+          <input type="text" id="AddTITransportNumber" placeholder="Transport Number">
+        </div>
+      </div>
+      <div class="field-row cols-2">
+        <div class="field">
+          <label for="AddTITransferStartDate">Start Date of Transfer</label>
+          <input type="date" id="AddTITransferStartDate">
+        </div>
+        <div class="field">
+          <label for="AddTITransferStartTime">Start Time of Transfer</label>
+          <input type="time" id="AddTITransferStartTime">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="addTransferCloseBtn" type="button">Close</button>
+        <button class="btn-primary" id="addTransferSaveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Invoice modal -->
+  <div class="modal-overlay" id="overlay">
+    <div class="modal-box invoice-modal-box">
+      <h3>New Invoice</h3>
+
+      <form id="invoiceForm" action="/new_invoice" method="POST">
+
+        <h4 class="form-section-title">Invoice Details</h4>
+
+        <div class="field-row cols-2">
+          <div class="field">
+            <label for="InvCustomerSearchInput">Customer</label>
+            <div class="customer-search" id="InvCustomerSearchWrap">
+              <input type="text" id="InvCustomerSearchInput" class="customer-search-input" placeholder="Search customer..." autocomplete="off">
+              <input type="hidden" id="InvCustomer" name="customer_id" value="">
+              <div class="customer-search-results" id="InvCustomerSearchResults">
+                {% for customer in customers %}
+                  <div class="customer-option" data-id="{{ customer['id'] }}" data-name="{{ customer['name'] }}">{{ customer['name'] }}</div>
+                {% endfor %}
+                <div class="customer-option no-match" id="InvCustomerNoMatch" style="display:none;">No matching customers</div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="DocumentType">Document Type</label>
+            <select id="DocumentType" name="document_type" required>
+              <option value="">Select Document Type</option>
+              <option value="sales_invoice" selected>Sales Invoice</option>
+              <option value="sales_invoice_ics">Sales Invoice &amp; Intra Community Supply</option>
+              <option value="service_invoice">Service Invoice</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row cols-2">
+          <div class="field">
+            <label for="InvDate">Date</label>
+            <input type="date" id="InvDate" name="invoice_date" required>
+          </div>
+          <div class="field">
+            <label for="InvNumber">Invoice No.</label>
+            <input type="text" id="InvNumber" name="invoice_number" placeholder="Enter invoice number">
+          </div>
+        </div>
+
+        <div class="field-row cols-2">
+          <div class="field">
+            <label>Transfer Information</label>
+            <div class="transfer-field">
+              <button class="mbtn msecondary" id="openTransferBtn" type="button">Add Transfer Info</button>
+              <span class="transfer-status" id="transferStatus">Not set</span>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+
+        <h4 class="form-section-title">Products</h4>
+
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>SKU</th>
+                <th>Price</th>
+                <th>LOT Number</th>
+                <th>Quantity</th>
+                <th>Subtotal</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="inv-product-table-body">
+              <tr class="no-products-row" id="inv-no-products-row">
+                <td colspan="7">No products added yet</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="table-footer">
+            <button class="add-btn" id="inv-open-modal-btn" type="button">&#10009; Add another item</button>
+            <div>
+              <span class="total-label">Total : </span>
+              <span class="total-amount" id="inv-total-amount">{{ 0 | currency(account.currency if account else 'USD') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <input type="hidden" name="products" id="inv-products-json">
+        <input type="hidden" name="transfer_info" id="transfer-info-json">
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveBtn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Product modal (nested inside New Invoice) -->
+  <div class="modal-overlay" id="inv-modal-overlay">
+    <div class="modal-box">
+      <h3>Add Product</h3>
+
+      <div class="form-group">
+        <label for="inv-product-search-input">Product</label>
+        <div class="customer-search" id="inv-product-search-wrap">
+          <input type="text" id="inv-product-search-input" class="customer-search-input" placeholder="Search product..." autocomplete="off">
+          <input type="hidden" id="inv-product-select" value="">
+          <div class="customer-search-results" id="inv-product-search-results">
+            {% for product in products %}
+              <div class="customer-option" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-pid="{{ product.pid }}" data-sku="{{ product.sku or '' }}">{{ product.name }}</div>
+            {% endfor %}
+            <div class="customer-option no-match" id="inv-product-no-match" style="display:none;">No matching products</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="inv-sku-display">SKU</label>
+        <input type="text" id="inv-sku-display" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="inv-price-display">Price</label>
+        <input type="text" id="inv-price-display" readonly>
+      </div>
+
+      <div class="form-group">
+        <label for="inv-quantity-input">Quantity</label>
+        <input type="number" id="inv-quantity-input" min="1" value="1">
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="inv-cancel-modal-btn" type="button">Cancel</button>
+        <button class="btn-primary" id="inv-confirm-add-btn" type="button">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Information modal -->
+  <div class="modal-overlay transfer-overlay" id="transfer-overlay">
+    <div class="modal-box transfer-modal-box">
+      <h3>Transfer Information</h3>
+
+      <h4 class="form-section-title">Loading Location</h4>
+      <div class="field-row cols-3">
+        <div class="field">
+          <label for="LoadingAddress">Address</label>
+          <input type="text" id="LoadingAddress" placeholder="Address">
+        </div>
+        <div class="field">
+          <label for="LoadingCity">City</label>
+          <input type="text" id="LoadingCity" placeholder="City">
+        </div>
+        <div class="field">
+          <label for="LoadingPostalCode">Postal Code</label>
+          <input type="text" id="LoadingPostalCode" placeholder="Postal Code">
+        </div>
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Place of Destination</h4>
+      <div class="field-row cols-4">
+        <div class="field">
+          <label for="DestinationAddress">Address</label>
+          <input type="text" id="DestinationAddress" placeholder="Address">
+        </div>
+        <div class="field">
+          <label for="DestinationCity">City</label>
+          <input type="text" id="DestinationCity" placeholder="City">
+        </div>
+        <div class="field">
+          <label for="DestinationPostalCode">Postal Code</label>
+          <input type="text" id="DestinationPostalCode" placeholder="Postal Code">
+        </div>
+        <div class="field">
+          <label for="DestinationCountry">Country</label>
+          <input type="text" id="DestinationCountry" placeholder="Country">
+        </div>
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Mode of Transport</h4>
+      <div class="field-row cols-2">
+        <div class="field">
+          <label for="TransportCompany">Transport Company</label>
+          <input type="text" id="TransportCompany" placeholder="Transport Company">
+        </div>
+        <div class="field">
+          <label for="TransportNumber">Transport Number</label>
+          <input type="text" id="TransportNumber" placeholder="Transport Number">
+        </div>
+      </div>
+      <div class="field-row cols-2">
+        <div class="field">
+          <label for="TransferStartDate">Start Date of Transfer</label>
+          <input type="date" id="TransferStartDate">
+        </div>
+        <div class="field">
+          <label for="TransferStartTime">Start Time of Transfer</label>
+          <input type="time" id="TransferStartTime">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="transferCloseBtn" type="button">Close</button>
+        <button class="btn-primary" id="transferSaveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Scan With AI Modal ========== -->
+  <div class="modal-overlay" id="scanAIModal">
+    <div class="modal-box scan-ai-box">
+      <h3>Scan Invoices with AI</h3>
+      <p style="color: #666; font-size: 14px;">Upload a PDF invoice to let AI extract data automatically.</p>
+
+      <!-- Drop zone -->
+      <div class="drop-zone" id="aiDropZone">
+        <div class="file-icon">📄</div>
+        <p><strong>Click to select</strong> or drag &amp; drop a PDF here</p>
+        <p style="font-size: 12px; color: #999; margin-top: 8px;">Only PDF files are accepted</p>
+        <input type="file" id="aiFileInput" accept=".pdf,application/pdf">
+      </div>
+
+      <!-- File info (displayed after selection) -->
+      <div id="aiFileInfo" class="file-info" style="display: none;"></div>
+
+      <!-- Fake progress bar (shown while processing) -->
+      <div id="aiScanProgressWrap" class="scan-progress-wrap" style="display: none;">
+        <div class="scan-progress-label">
+          <span id="aiScanProgressText">Analyzing invoice…</span>
+          <span id="aiScanProgressPct">0%</span>
+        </div>
+        <div class="scan-progress-track">
+          <div id="aiScanProgressFill" class="scan-progress-fill"></div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="aiCancelBtn" type="button">Cancel</button>
+        <button class="btn-primary" id="aiProcessBtn" type="button" disabled>Process</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Scan Confirm Modal (Order-History style) ========== -->
+  <div class="modal-overlay" id="scanConfirmModal">
+    <div class="modal-box scan-confirm-box">
+      <h3>Confirm Scanned Invoice</h3>
+
+      <!-- Editable meta fields: click a field to edit it -->
+      <div class="scan-confirm-meta" id="scan-confirm-meta">
+        <div class="scan-field" data-type="select">
+          <span class="label">Document Type</span>
+          <span class="value-display" id="scan-doc-type-display"></span>
+          <select id="scan-doc-type" class="value-input" style="display:none;">
+            <option value="sales_invoice">Sales Invoice</option>
+            <option value="sales_invoice_ics">Sales Invoice &amp; Intra Community Supply</option>
+            <option value="service_invoice">Service Invoice</option>
+          </select>
+        </div>
+        <div class="scan-field" data-type="date">
+          <span class="label">Date</span>
+          <span class="value-display" id="scan-date-display"></span>
+          <input type="date" id="scan-date" class="value-input" style="display:none;">
+        </div>
+        <div class="scan-field" data-type="date">
+          <span class="label">Issue Date</span>
+          <span class="value-display" id="scan-issue-date-display"></span>
+          <input type="date" id="scan-issue-date" class="value-input" style="display:none;">
+        </div>
+        <div class="scan-field" data-type="text">
+          <span class="label">Customer</span>
+          <span class="value-display" id="scan-customer-display"></span>
+          <input type="text" id="scan-customer" class="value-input" style="display:none;">
+        </div>
+        <div class="scan-field" data-type="text">
+          <span class="label">Customer VAT</span>
+          <span class="value-display" id="scan-customer-vat-display"></span>
+          <input type="text" id="scan-customer-vat" class="value-input" style="display:none;">
+        </div>
+        <div class="scan-field" data-type="select">
+          <span class="label">Status</span>
+          <span class="value-display" id="scan-status-display"></span>
+          <select id="scan-status" class="value-input" style="display:none;">
+            <option value="Pending">Pending</option>
+            <option value="Paid">Paid</option>
+          </select>
+        </div>
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Products</h4>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Price</th>
+              <th>LOT Number</th>
+              <th>Quantity</th>
+              <th>Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="scan-confirm-products-body">
+            <!-- rows will be inserted dynamically -->
+          </tbody>
+        </table>
+        <div class="table-footer" style="display: flex; justify-content: space-between; padding: 8px 12px;">
+          <button class="add-btn" id="scan-add-product-btn" type="button">&#10009; Add Product</button>
+          <div>
+            <span class="total-label">Total : </span>
+            <span class="total-amount" id="scan-confirm-total-amount">{{ 0 | currency(account.currency if account else 'USD') }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="scanConfirmCancelBtn" type="button">Cancel</button>
+        <button class="btn-primary" id="scanConfirmOkBtn" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Save Missing Contact Modal ========== -->
+  <div class="modal-overlay" id="saveContactModal">
+    <div class="modal-box" style="width: 480px; max-width: 90vw; max-height: 85vh; overflow-y: auto;">
+      <h3 id="saveContactTitle">Save New Contact</h3>
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">This contact was not found in your address book. Would you like to save it?</p>
+
+      <div class="scan-confirm-meta" id="save-contact-meta">
+        <!-- filled by JS -->
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="saveContactSkipBtn" type="button">Skip</button>
+        <button class="btn-primary" id="saveContactSaveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== Drop Overlay (full-screen blur) ========== -->
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-text">
+      Drop invoices here to scan with AI
+      <small>Only PDF files are accepted</small>
+    </div>
+  </div>
+
+  <!-- ========== Drop Overlay (full-screen blur) ========== -->
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-text">
+      Drop invoices here to scan with AI
+      <small>Only PDF files are accepted</small>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script>
+  // Account's chosen currency (ISO code), passed from the server.
+  // Falls back to USD if the account/currency isn't set for any reason.
+  const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
+
+  // Mirrors the symbol set in currency_filter.py - keep the two in sync.
+  // Only currencies with a widely-recognized, unambiguous symbol are
+  // listed; everything else falls back to its 3-letter ISO code.
+  const CURRENCY_SYMBOLS = {
+    USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', CHF: 'CHF',
+    INR: '₹', KRW: '₩', VND: '₫', TRY: '₺', ILS: '₪', THB: '฿', PHP: '₱'
+  };
+
+  // ---- New Invoice modal open/close ----
+  const openBtn = document.getElementById('openFormBtn');
+  const overlay = document.getElementById('overlay');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  openBtn.addEventListener('click', () => {
+    overlay.classList.add('open');
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    overlay.classList.remove('open');
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+
+  // ---- Searchable customer dropdown (New Invoice modal) ----
+  const invCustomerSelect = document.getElementById('InvCustomer');
+  const invCustomerSearchWrap = document.getElementById('InvCustomerSearchWrap');
+  const invCustomerSearchInput = document.getElementById('InvCustomerSearchInput');
+  const invCustomerSearchResults = document.getElementById('InvCustomerSearchResults');
+  const invCustomerNoMatch = document.getElementById('InvCustomerNoMatch');
+  const invCustomerOptions = Array.from(invCustomerSearchResults.querySelectorAll('.customer-option:not(.no-match)'));
+
+  function openInvCustomerResults() {
+    invCustomerSearchResults.classList.add('open');
+  }
+
+  function closeInvCustomerResults() {
+    invCustomerSearchResults.classList.remove('open');
+  }
+
+  function filterInvCustomerOptions() {
+    const query = invCustomerSearchInput.value.trim().toLowerCase();
+    let visibleCount = 0;
+
+    invCustomerOptions.forEach(option => {
+      const matches = option.dataset.name.toLowerCase().includes(query);
+      option.classList.toggle('hidden', !matches);
+      if (matches) visibleCount += 1;
+    });
+
+    invCustomerNoMatch.style.display = visibleCount === 0 ? '' : 'none';
+  }
+
+  function selectInvCustomer(option) {
+    invCustomerSelect.value = option.dataset.id;
+    invCustomerSearchInput.value = option.dataset.name;
+    closeInvCustomerResults();
+  }
+
+  invCustomerSearchInput.addEventListener('focus', () => {
+    filterInvCustomerOptions();
+    openInvCustomerResults();
+  });
+
+  invCustomerSearchInput.addEventListener('input', () => {
+    // typing invalidates any previously selected customer until a new one is chosen
+    invCustomerSelect.value = '';
+    filterInvCustomerOptions();
+    openInvCustomerResults();
+  });
+
+  invCustomerOptions.forEach(option => {
+    option.addEventListener('click', () => selectInvCustomer(option));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!invCustomerSearchWrap.contains(e.target)) {
+      closeInvCustomerResults();
+    }
+  });
+
+  // ---- Transfer Information modal (nested, blank for now) ----
+  const transferOverlay = document.getElementById('transfer-overlay');
+  const openTransferBtn = document.getElementById('openTransferBtn');
+  const transferCloseBtn = document.getElementById('transferCloseBtn');
+  const transferSaveBtn = document.getElementById('transferSaveBtn');
+  const transferStatus = document.getElementById('transferStatus');
+  const transferInfoJsonInput = document.getElementById('transfer-info-json');
+
+  openTransferBtn.addEventListener('click', () => {
+    transferOverlay.classList.add('open');
+  });
+
+  function closeTransferModal() {
+    transferOverlay.classList.remove('open');
+  }
+
+  transferCloseBtn.addEventListener('click', closeTransferModal);
+  transferOverlay.addEventListener('click', (e) => {
+    if (e.target === transferOverlay) closeTransferModal();
+  });
+
+  function transferFieldValue(id) {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+
+  transferSaveBtn.addEventListener('click', () => {
+    const transferInfo = {
+      loading_location: {
+        address: transferFieldValue('LoadingAddress'),
+        city: transferFieldValue('LoadingCity'),
+        postal_code: transferFieldValue('LoadingPostalCode')
+      },
+      place_of_destination: {
+        address: transferFieldValue('DestinationAddress'),
+        city: transferFieldValue('DestinationCity'),
+        postal_code: transferFieldValue('DestinationPostalCode'),
+        country: transferFieldValue('DestinationCountry')
+      },
+      mode_of_transport: {
+        transport_company: transferFieldValue('TransportCompany'),
+        transport_number: transferFieldValue('TransportNumber'),
+        start_date: transferFieldValue('TransferStartDate'),
+        start_time: transferFieldValue('TransferStartTime')
+      }
+    };
+
+    transferInfoJsonInput.value = JSON.stringify(transferInfo);
+
+    const hasAnyValue = Object.values(transferInfo)
+      .some(section => Object.values(section).some(v => v !== ''));
+    transferStatus.textContent = hasAnyValue ? 'Set' : 'Not set';
+
+    closeTransferModal();
+  });
+
+  // ---- Add Product modal (nested inside New Invoice) ----
+  const invTableBody = document.getElementById('inv-product-table-body');
+  const invNoProductsRow = document.getElementById('inv-no-products-row');
+  const invTotalAmountEl = document.getElementById('inv-total-amount');
+
+  const invModalOverlay = document.getElementById('inv-modal-overlay');
+  const invOpenModalBtn = document.getElementById('inv-open-modal-btn');
+  const invCancelModalBtn = document.getElementById('inv-cancel-modal-btn');
+  const invConfirmAddBtn = document.getElementById('inv-confirm-add-btn');
+
+  const invProductSelect = document.getElementById('inv-product-select');
+  const invProductSearchWrap = document.getElementById('inv-product-search-wrap');
+  const invProductSearchInput = document.getElementById('inv-product-search-input');
+  const invProductSearchResults = document.getElementById('inv-product-search-results');
+  const invProductNoMatch = document.getElementById('inv-product-no-match');
+  const invProductOptions = Array.from(invProductSearchResults.querySelectorAll('.customer-option:not(.no-match)'));
+  const invPriceDisplay = document.getElementById('inv-price-display');
+  const invSkuDisplay = document.getElementById('inv-sku-display');
+  const invQuantityInput = document.getElementById('inv-quantity-input');
+
+  let invRowCounter = 0;
+
+  function formatMoney(value) {
+    const num = parseFloat(value);
+    const amount = isNaN(num) ? 0 : num;
+    const formattedNumber = amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    const label = CURRENCY_SYMBOLS[accountCurrency] || accountCurrency;
+    return `${formattedNumber} ${label}`;
+  }
+
+  // ---- PDF invoice preview (built from invoice_template.png layout) ----
+  const rawCompanyInfo = JSON.parse(document.getElementById('company-data').textContent || '{}');
+
+  function buildAddressLines(streetLine, city, country) {
+    return [streetLine, city, country].filter(Boolean);
+  }
+
+  const COMPANY_INFO = {
+    name: rawCompanyInfo.name || 'Your Company',
+    afm: rawCompanyInfo.afm || '',
+    addressLines: buildAddressLines(
+      [rawCompanyInfo.street, rawCompanyInfo.addressnumber].filter(Boolean).join(' '),
+      rawCompanyInfo.city,
+      rawCompanyInfo.country
+    ),
+    email: rawCompanyInfo.email || '',
+    phone: rawCompanyInfo.phone || '',
+    logoUrl: rawCompanyInfo.logo_url || ''
+  };
+
+  function esc(value) {
+    const div = document.createElement('div');
+    div.textContent = (value === null || value === undefined) ? '' : String(value);
+    return div.innerHTML;
+  }
+
+  function buildInvoicePdfHtml(invoice) {
+    const products = invoice.products || [];
+
+    // Prefer the pre-computed totals from the backend (which already account for
+    // per-product tax rates); fall back to summing line items if they're missing.
+    const subtotal = (invoice.subtotal !== undefined && invoice.subtotal !== null)
+      ? parseFloat(invoice.subtotal)
+      : products.reduce((sum, p) => sum + (parseFloat(p.subtotal) || 0), 0);
+    const vatTotal = (invoice.vat_total !== undefined && invoice.vat_total !== null)
+      ? parseFloat(invoice.vat_total)
+      : products.reduce((sum, p) => sum + (parseFloat(p.vat_amount) || 0), 0);
+    const total = (invoice.total !== undefined && invoice.total !== null)
+      ? parseFloat(invoice.total)
+      : (subtotal + vatTotal);
+
+    const companyAddressHtml = COMPANY_INFO.addressLines.map(l => '<p>' + esc(l) + '</p>').join('');
+    const companyAfmHtml = COMPANY_INFO.afm ? ('<p>VAT: ' + esc(COMPANY_INFO.afm) + '</p>') : '';
+    const logoHtml = COMPANY_INFO.logoUrl
+    ? '<div class="logo-wrap-print"><img src="' + esc(COMPANY_INFO.logoUrl) + '" alt="' + esc(COMPANY_INFO.name) + ' logo" class="logo-img" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="logo logo-fallback">LOGO</div></div>'
+    : '<div style="width:90px;height:90px;flex-shrink:0;"></div>';
+
+    const customerAddressLines = [
+      invoice.customer_address,
+      [invoice.customer_pcode, invoice.customer_city].filter(Boolean).join(' '),
+      invoice.customer_country
+    ].filter(Boolean);
+    const customerAddressHtml = customerAddressLines.map(l => '<p>' + esc(l) + '</p>').join('');
+    const customerAfmHtml = invoice.customer_afm ? ('<p>VAT: ' + esc(invoice.customer_afm) + '</p>') : '';
+    const customerContactHtml = [invoice.customer_phone, invoice.customer_email]
+      .filter(Boolean)
+      .map(l => '<p>' + esc(l) + '</p>')
+      .join('');
+
+    const rowsHtml = products.length
+      ? products.map(p => {
+          const price = parseFloat(p.price);
+          const rowSubtotal = (p.subtotal !== undefined && p.subtotal !== null)
+            ? parseFloat(p.subtotal)
+            : (price * (parseFloat(p.quantity) || 0));
+          const taxRate = (p.tax_rate !== undefined && p.tax_rate !== null) ? parseFloat(p.tax_rate) : 0;
+          const lineTotal = (p.line_total !== undefined && p.line_total !== null)
+            ? parseFloat(p.line_total)
+            : (rowSubtotal + rowSubtotal * taxRate / 100);
+          return `
+            <tr>
+              <td>${esc(p.name)}</td>
+              <td>${esc(p.quantity)}</td>
+              <td>${isNaN(price) ? '-' : formatMoney(price)}</td>
+              <td>${isNaN(taxRate) ? '-' : taxRate + '%'}</td>
+              <td class="amount">${isNaN(lineTotal) ? '-' : formatMoney(lineTotal)}</td>
+            </tr>`;
+        }).join('')
+      : '<tr><td colspan="5" class="no-items">No line items on this invoice</td></tr>';
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Invoice ${esc(invoice.doc_number || invoice.id || '')}</title>
+<style>
+  @page { size: A4; margin: 24mm 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: #111; margin: 0; padding: 32px 40px; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+  .company-name { font-weight: 700; font-size: 15px; margin-bottom: 10px; }
+  .company p { margin: 0 0 6px; font-size: 13px; }
+  .logo { width: 90px; height: 90px; border-radius: 50%; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; letter-spacing: 1px; flex-shrink: 0; }
+  .logo-wrap-print { width: auto; max-width: 280px; height: 90px; display: flex; align-items: center; justify-content: flex-end; }
+  .logo-img { width: auto; height: auto; max-width: 280px; max-height: 90px; object-fit: contain; display: block; }
+  .logo-fallback { display: none; }
+  .meta-row { display: flex; justify-content: space-between; margin-bottom: 36px; gap: 40px; }
+  .meta-block h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 10px; }
+  .meta-block p { margin: 0 0 6px; font-size: 13px; }
+  .meta-line { display: flex; justify-content: space-between; gap: 24px; font-size: 13px; margin-bottom: 6px; min-width: 220px; }
+  .meta-line span:first-child { color: #444; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  thead th { text-align: left; background: #eee; font-size: 12px; padding: 10px 12px; }
+  thead th.amount, td.amount { text-align: right; }
+  tbody td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #eee; }
+  .no-items { text-align: center; color: #999; font-style: italic; }
+  .totals { width: 260px; margin-left: auto; font-size: 13px; }
+  .totals .line { display: flex; justify-content: space-between; padding: 6px 0; }
+  .totals .grand { border-top: 1px solid #111; font-weight: 700; font-size: 15px; padding-top: 10px; margin-top: 4px; }
+  .print-bar { text-align: right; margin-bottom: 20px; }
+  .print-bar button { background: #111; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  @media print { .print-bar { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">Print / Save as PDF</button></div>
+
+  <div class="top">
+    <div class="company">
+      <div class="company-name">${esc(COMPANY_INFO.name)}</div>
+      ${companyAddressHtml}
+      ${companyAfmHtml}
+      <p>${esc(COMPANY_INFO.email)}</p>
+      <p>${esc(COMPANY_INFO.phone)}</p>
+    </div>
+    ${logoHtml}
+  </div>
+
+  <div class="meta-row">
+    <div class="meta-block">
+      <h4>Bill To</h4>
+      <p>${esc(invoice.customer_name)}</p>
+      ${customerAddressHtml}
+      ${customerAfmHtml}
+      ${customerContactHtml}
+    </div>
+    <div class="meta-block">
+      <h4>Invoice</h4>
+      <div class="meta-line"><span>Invoice No.:</span><span>${esc(invoice.invoice_number || '')}</span></div>
+      <div class="meta-line"><span>Document Type:</span><span>${esc(invoice.doc_number)}</span></div>
+      <div class="meta-line"><span>Issue Date:</span><span>${esc(invoice.issue_date)}</span></div>
+      <div class="meta-line"><span>Date:</span><span>${esc(invoice.date)}</span></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th>Quantity</th>
+        <th>Unit Price</th>
+        <th>VAT</th>
+        <th class="amount">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    <div class="line"><span>Subtotal</span><span>${formatMoney(subtotal)}</span></div>
+    <div class="line"><span>VAT</span><span>${formatMoney(vatTotal)}</span></div>
+    <div class="line grand"><span>Total</span><span>${formatMoney(total)}</span></div>
+  </div>
+
+  <script>
+    // Auto-open the print dialog once the page has rendered; the button above
+    // is a fallback for browsers that block programmatic print prompts.
+    window.addEventListener('load', () => setTimeout(() => window.print(), 200));
+  <\/script>
+</body>
+</html>`;
+  }
+
+  function openInvoicePdf(invoiceId) {
+    const invoice = findInvoice(invoiceId);
+    if (!invoice) return;
+
+    const html = buildInvoicePdfHtml(invoice);
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const pdfWindow = window.open(url, '_blank');
+
+    if (!pdfWindow) {
+      alert('Please allow pop-ups for this site to view the invoice PDF.');
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Release the blob URL once the new tab has had a chance to load it.
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  }
+
+  function invUpdatePriceDisplay() {
+    const price = parseFloat(invProductSelect.dataset.price || 0);
+    invPriceDisplay.value = invProductSelect.value ? formatMoney(price) : '';
+    invSkuDisplay.value = invProductSelect.value ? (invProductSelect.dataset.sku || '-') : '';
+  }
+
+  function invOpenModal() {
+    invProductSelect.value = '';
+    delete invProductSelect.dataset.name;
+    delete invProductSelect.dataset.price;
+    delete invProductSelect.dataset.pid;
+    delete invProductSelect.dataset.sku;
+    invProductSearchInput.value = '';
+    invUpdatePriceDisplay();
+    invQuantityInput.value = 1;
+    invModalOverlay.classList.add('open');
+  }
+
+  function invCloseModal() {
+    invModalOverlay.classList.remove('open');
+  }
+
+  function invRecalcTotal() {
+    const subtotalCells = invTableBody.querySelectorAll('.subtotal-cell');
+    let total = 0;
+    subtotalCells.forEach(cell => {
+      total += parseFloat(cell.dataset.value || 0);
+    });
+    invTotalAmountEl.textContent = formatMoney(total);
+  }
+
+  function invToggleNoProductsRow() {
+    const hasRows = invTableBody.querySelectorAll('tr[data-row-id]').length > 0;
+    invNoProductsRow.style.display = hasRows ? 'none' : '';
+  }
+
+  function invGetJulianDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const startOfYear = new Date(year, 0, 0);
+    const diffMs = now - startOfYear;
+    const dayOfYear = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const dayStr = String(dayOfYear).padStart(3, '0');
+    return `${year}${dayStr}`;
+  }
+
+  function invGenerateLotNumber(pid) {
+    const julian = invGetJulianDate();
+    // keep digits only, then take the first 5
+    const digitsOnly = String(pid || '').replace(/\D/g, '');
+    const pidPart = digitsOnly.substring(0, 5).padStart(5, '0');
+    return julian + pidPart;
+  }
+
+  function invAddProductRow(productId, name, price, quantity, pid, sku) {
+    invRowCounter += 1;
+    const rowId = 'inv-row-' + invRowCounter;
+    const subtotal = price * quantity;
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-row-id', rowId);
+    tr.setAttribute('data-product-id', productId);
+    tr.setAttribute('data-price', price);
+    tr.setAttribute('data-quantity', quantity);
+    tr.setAttribute('data-pid', pid || '');
+    tr.setAttribute('data-sku', sku || '');
+
+    tr.innerHTML = `
+      <td class="product-name">${name}</td>
+      <td class="product-sku">${sku || '-'}</td>
+      <td>${formatMoney(price)}</td>
+      <td>
+        <div class="lot-cell">
+          <input type="text" class="lot-input" placeholder="Enter LOT #">
+          <button type="button" class="lot-gen-btn" title="Auto-generate LOT number">&#43;</button>
+        </div>
+      </td>
+      <td class="quantity-cell">${quantity} Item</td>
+      <td class="subtotal-cell" data-value="${subtotal}">${formatMoney(subtotal)}</td>
+      <td><button type="button" class="remove-btn">Remove</button></td>
+    `;
+
+    tr.querySelector('.remove-btn').addEventListener('click', () => {
+      tr.remove();
+      invToggleNoProductsRow();
+      invRecalcTotal();
+    });
+
+    tr.querySelector('.lot-gen-btn').addEventListener('click', () => {
+      const lotInput = tr.querySelector('.lot-input');
+      lotInput.value = invGenerateLotNumber(tr.dataset.pid);
+    });
+
+    invTableBody.appendChild(tr);
+    invToggleNoProductsRow();
+    invRecalcTotal();
+  }
+
+  invOpenModalBtn.addEventListener('click', invOpenModal);
+  invCancelModalBtn.addEventListener('click', invCloseModal);
+
+  invModalOverlay.addEventListener('click', (e) => {
+    if (e.target === invModalOverlay) invCloseModal();
+  });
+
+  function openInvProductResults() {
+    invProductSearchResults.classList.add('open');
+  }
+
+  function closeInvProductResults() {
+    invProductSearchResults.classList.remove('open');
+  }
+
+  function filterInvProductOptions() {
+    const query = invProductSearchInput.value.trim().toLowerCase();
+    let visibleCount = 0;
+
+    invProductOptions.forEach(option => {
+      const matches = option.dataset.name.toLowerCase().includes(query)
+        || (option.dataset.sku || '').toLowerCase().includes(query);
+      option.classList.toggle('hidden', !matches);
+      if (matches) visibleCount += 1;
+    });
+
+    invProductNoMatch.style.display = visibleCount === 0 ? '' : 'none';
+  }
+
+  function selectInvProduct(option) {
+    invProductSelect.value = option.dataset.id;
+    invProductSelect.dataset.name = option.dataset.name;
+    invProductSelect.dataset.price = option.dataset.price;
+    invProductSelect.dataset.pid = option.dataset.pid;
+    invProductSelect.dataset.sku = option.dataset.sku;
+    invProductSearchInput.value = option.dataset.name;
+    closeInvProductResults();
+    invUpdatePriceDisplay();
+  }
+
+  invProductSearchInput.addEventListener('focus', () => {
+    filterInvProductOptions();
+    openInvProductResults();
+  });
+
+  invProductSearchInput.addEventListener('input', () => {
+    // typing invalidates any previously selected product until a new one is chosen
+    invProductSelect.value = '';
+    delete invProductSelect.dataset.name;
+    delete invProductSelect.dataset.price;
+    delete invProductSelect.dataset.pid;
+    delete invProductSelect.dataset.sku;
+    invUpdatePriceDisplay();
+    filterInvProductOptions();
+    openInvProductResults();
+  });
+
+  invProductOptions.forEach(option => {
+    option.addEventListener('click', () => selectInvProduct(option));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!invProductSearchWrap.contains(e.target)) {
+      closeInvProductResults();
+    }
+  });
+
+  invConfirmAddBtn.addEventListener('click', () => {
+    const productId = invProductSelect.value;
+    const name = invProductSelect.dataset.name;
+    const price = parseFloat(invProductSelect.dataset.price);
+    const pid = invProductSelect.dataset.pid;
+    const sku = invProductSelect.dataset.sku;
+    const quantity = parseInt(invQuantityInput.value, 10);
+
+    if (!productId) {
+      alert('Please select a product.');
+      return;
+    }
+
+    if (!quantity || quantity < 1) {
+      alert('Please enter a valid quantity.');
+      return;
+    }
+
+    invAddProductRow(productId, name, price, quantity, pid, sku);
+    invCloseModal();
+  });
+
+  // ---- Build products JSON before submitting the invoice form ----
+  const invoiceForm = document.getElementById('invoiceForm');
+  const invProductsJsonInput = document.getElementById('inv-products-json');
+
+  invoiceForm.addEventListener('submit', (e) => {
+    if (!invCustomerSelect.value) {
+      e.preventDefault();
+      alert('Please select a customer.');
+      return;
+    }
+
+    const rows = invTableBody.querySelectorAll('tr[data-row-id]');
+
+    if (rows.length === 0) {
+      e.preventDefault();
+      alert('Please add at least one product to the invoice.');
+      return;
+    }
+
+    const products = Array.from(rows).map(tr => {
+      const price = parseFloat(tr.dataset.price);
+      const quantity = parseInt(tr.dataset.quantity, 10);
+      const lotInput = tr.querySelector('.lot-input');
+      return {
+        product_id: tr.dataset.productId,
+        name: tr.querySelector('.product-name').textContent,
+        sku: tr.dataset.sku || '',
+        price: price,
+        quantity: quantity,
+        lot_number: lotInput ? lotInput.value : '',
+        subtotal: price * quantity
+      };
+    });
+
+    invProductsJsonInput.value = JSON.stringify(products);
+  });
+
+  invToggleNoProductsRow();
+  invRecalcTotal();
+
+  // ---- Invoices data (used by the Transfer Info view modal) ----
+  const invoicesData = JSON.parse(document.getElementById('invoices-data').textContent);
+
+  function findInvoice(invoiceId) {
+    return invoicesData.find((inv, idx) => {
+      const id = (inv.id !== undefined) ? inv.id : idx;
+      return String(id) === String(invoiceId);
+    });
+  }
+
+  function findInvoiceByOid(oid) {
+    return invoicesData.find(inv => String(inv.oid) === String(oid));
+  }
+
+  // ---- Transfer Info view modal (read-only) ----
+  const transferViewOverlay = document.getElementById('transfer-view-overlay');
+  const transferViewCloseBtn = document.getElementById('transferViewCloseBtn');
+  const transferViewAddMoreBtn = document.getElementById('transferViewAddMoreBtn');
+  const transferViewEntries = document.getElementById('transfer-view-entries');
+  let currentTransferViewOid = null;
+
+  function displayValue(value) {
+    if (value === null || value === undefined) return '-';
+    const str = String(value).trim();
+    return str === '' ? '-' : str;
+  }
+
+  // ---- Invoice Details view modal (read-only, everything except transfer info) ----
+  const invoiceViewOverlay = document.getElementById('invoice-view-overlay');
+  const invoiceViewCloseBtn = document.getElementById('invoiceViewCloseBtn');
+  const invoiceViewInfo = document.getElementById('invoice-view-info');
+  const invoiceViewProductsBody = document.getElementById('invoice-view-products-body');
+
+  function openInvoiceView(invoiceId) {
+    const invoice = findInvoice(invoiceId);
+    if (!invoice) return;
+
+    const total = parseFloat(invoice.total);
+
+    invoiceViewInfo.innerHTML = `
+      <div><span class="label">Invoice No.</span><span class="value">${displayValue(invoice.invoice_number)}</span></div>
+      <div><span class="label">Accounting Document</span><span class="value">${displayValue(invoice.doc_number)}</span></div>
+      <div><span class="label">Status</span><span class="value">${displayValue(invoice.status)}</span></div>
+      <div><span class="label">Customer</span><span class="value">${displayValue(invoice.customer_name)}</span></div>
+      <div><span class="label">Customer VAT Number</span><span class="value">${displayValue(invoice.customer_afm)}</span></div>
+      <div><span class="label">Date</span><span class="value">${displayValue(invoice.date)}</span></div>
+      <div><span class="label">Issue Date</span><span class="value">${displayValue(invoice.issue_date)}</span></div>
+      <div><span class="label">Total</span><span class="value">${isNaN(total) ? '-' : formatMoney(total)}</span></div>
+    `;
+
+    const products = invoice.products || [];
+    if (products.length === 0) {
+      invoiceViewProductsBody.innerHTML = '<tr class="no-products-row"><td colspan="5">No products on this invoice</td></tr>';
+    } else {
+      invoiceViewProductsBody.innerHTML = products.map(p => {
+        const price = parseFloat(p.price);
+        const subtotal = parseFloat(p.subtotal);
+        return `
+          <tr>
+            <td class="product-name">${displayValue(p.name)}</td>
+            <td>${isNaN(price) ? '-' : formatMoney(price)}</td>
+            <td>${displayValue(p.lot)}</td>
+            <td>${displayValue(p.quantity)}</td>
+            <td>${isNaN(subtotal) ? '-' : formatMoney(subtotal)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    invoiceViewOverlay.classList.add('open');
+  }
+
+  function closeInvoiceView() {
+    invoiceViewOverlay.classList.remove('open');
+  }
+
+  invoiceViewCloseBtn.addEventListener('click', closeInvoiceView);
+  invoiceViewOverlay.addEventListener('click', (e) => {
+    if (e.target === invoiceViewOverlay) closeInvoiceView();
+  });
+
+  // Renders one block per saved transfer entry into the view modal, each
+  // with its own Loading/Destination/Transport sections and a Delete
+  // button scoped to that entry. Shared by openTransferView() and by the
+  // "Add More" success handler, which refreshes this in place.
+  function renderTransferViewEntries(list) {
+    transferViewEntries.innerHTML = list.map((t, idx) => `
+      <div class="transfer-view-entry" data-transfer-id="${displayValue(t.transfer_id)}">
+        <div class="transfer-view-entry-header">
+          <h4 class="form-section-title">Transfer ${idx + 1}</h4>
+          <button type="button" class="btn-danger transfer-view-entry-delete" data-transfer-id="${displayValue(t.transfer_id)}">Delete</button>
+        </div>
+
+        <h4 class="form-section-title">Loading Location</h4>
+        <div class="transfer-view-meta">
+          <div><span class="label">Address</span><span class="value">${displayValue(t.laddress)}</span></div>
+          <div><span class="label">City</span><span class="value">${displayValue(t.lcity)}</span></div>
+          <div><span class="label">Postal Code</span><span class="value">${displayValue(t.lpostalcode)}</span></div>
+        </div>
+
+        <h4 class="form-section-title">Place of Destination</h4>
+        <div class="transfer-view-meta">
+          <div><span class="label">Address</span><span class="value">${displayValue(t.daddress)}</span></div>
+          <div><span class="label">City</span><span class="value">${displayValue(t.dcity)}</span></div>
+          <div><span class="label">Postal Code</span><span class="value">${displayValue(t.dpostalcode)}</span></div>
+          <div><span class="label">Country</span><span class="value">${displayValue(t.dcountry)}</span></div>
+        </div>
+
+        <h4 class="form-section-title">Mode of Transport</h4>
+        <div class="transfer-view-meta">
+          <div><span class="label">Transport Company</span><span class="value">${displayValue(t.tcompany)}</span></div>
+          <div><span class="label">Transport Number</span><span class="value">${displayValue(t.tnumber)}</span></div>
+          <div><span class="label">Start Date of Transfer</span><span class="value">${displayValue(t.sdate)}</span></div>
+          <div><span class="label">Start Time of Transfer</span><span class="value">${displayValue(t.stime)}</span></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openTransferView(oid) {
+    const invoice = findInvoiceByOid(oid);
+    const list = invoice ? invoice.transfer_infos : null;
+    if (!list || list.length === 0) return;
+
+    currentTransferViewOid = oid;
+    renderTransferViewEntries(list);
+    transferViewOverlay.classList.add('open');
+  }
+
+  function closeTransferView() {
+    // If an "Add More" form is sitting open next to the view, tidy it
+    // away instantly along with the view itself.
+    sideBySideAddTransferModal(false);
+    addTransferOid = null;
+    addTransferTriggerBtn = null;
+
+    transferViewOverlay.classList.remove('open');
+    currentTransferViewOid = null;
+  }
+
+  transferViewCloseBtn.addEventListener('click', closeTransferView);
+  transferViewOverlay.addEventListener('click', (e) => {
+    if (e.target === transferViewOverlay) closeTransferView();
+  });
+
+  // Delete is per-entry now (an order can have several), so this listens
+  // for clicks on whichever entry's Delete button was clicked rather than
+  // a single button for the whole modal.
+  transferViewEntries.addEventListener('click', (e) => {
+    const btn = e.target.closest('.transfer-view-entry-delete');
+    if (!btn || !currentTransferViewOid) return;
+    if (!confirm('Delete this transfer info? This cannot be undone.')) return;
+
+    const transferId = btn.dataset.transferId;
+
+    // TODO: wire up to a real backend endpoint once one exists, e.g.:
+    // fetch(`/delete_transfer_info`, { method: 'POST', body: JSON.stringify({ transfer_id: transferId }) })
+    console.log('Delete transfer info entry', transferId, 'for invoice', currentTransferViewOid);
+
+    const invoice = findInvoiceByOid(currentTransferViewOid);
+    if (invoice && Array.isArray(invoice.transfer_infos)) {
+      invoice.transfer_infos = invoice.transfer_infos.filter(t => String(t.transfer_id) !== String(transferId));
+    }
+
+    if (invoice && invoice.transfer_infos.length > 0) {
+      renderTransferViewEntries(invoice.transfer_infos);
+    } else {
+      closeTransferView();
+    }
+  });
+
+  transferViewAddMoreBtn.addEventListener('click', () => {
+    if (!currentTransferViewOid) return;
+    const oid = currentTransferViewOid;
+    // Keep the view modal open and place the "Add Transfer Info" form
+    // right next to it, instead of closing the view to open a separate,
+    // centered modal. Only this entry point does this - the table's "+"
+    // button still opens the plain, centered Add Transfer Info modal.
+    openAddTransferModal(oid, null, { sideBySide: true });
+  });
+
+  // ---- Add Transfer Info modal (for an existing invoice that has none yet) ----
+  const addTransferOverlay = document.getElementById('add-transfer-overlay');
+  const addTransferCloseBtn = document.getElementById('addTransferCloseBtn');
+  const addTransferSaveBtn = document.getElementById('addTransferSaveBtn');
+  const addTransferBox = addTransferOverlay.querySelector('.transfer-modal-box');
+
+  const addTransferFieldIds = [
+    'AddTILoadingAddress', 'AddTILoadingCity', 'AddTILoadingPostalCode',
+    'AddTIDestinationAddress', 'AddTIDestinationCity', 'AddTIDestinationPostalCode', 'AddTIDestinationCountry',
+    'AddTITransportCompany', 'AddTITransportNumber', 'AddTITransferStartDate', 'AddTITransferStartTime'
+  ];
+
+  let addTransferOid = null;
+  let addTransferTriggerBtn = null;
+
+  // True while the Add Transfer Info box has been moved out of its own
+  // overlay and placed next to the Transfer Info view box instead.
+  let addTransferIsSideBySide = false;
+
+  function addTransferFieldValue(id) {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+
+  // Moves the Add Transfer Info box to sit right next to the Transfer
+  // Info view box (open: true), or moves it back to its own overlay
+  // (open: false).
+  function sideBySideAddTransferModal(open) {
+    if (open === addTransferIsSideBySide) return;
+
+    if (open) {
+      addTransferIsSideBySide = true;
+      transferViewOverlay.classList.add('side-by-side');
+      transferViewOverlay.appendChild(addTransferBox);
+      // Force a reflow so the starting (faded-out) state registers
+      // before the "in" class kicks off the transition.
+      void addTransferBox.offsetHeight;
+      requestAnimationFrame(() => {
+        addTransferBox.classList.add('side-by-side-in');
+      });
+    } else {
+      addTransferIsSideBySide = false;
+      addTransferBox.classList.remove('side-by-side-in');
+      transferViewOverlay.classList.remove('side-by-side');
+      addTransferOverlay.appendChild(addTransferBox);
+    }
+  }
+
+  function openAddTransferModal(oid, triggerBtn, opts) {
+    opts = opts || {};
+    addTransferOid = oid;
+    addTransferTriggerBtn = triggerBtn;
+    addTransferFieldIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    if (opts.sideBySide) {
+      sideBySideAddTransferModal(true);
+    } else {
+      addTransferOverlay.classList.add('open');
+    }
+  }
+
+  function closeAddTransferModal() {
+    if (addTransferIsSideBySide) {
+      sideBySideAddTransferModal(false);
+    } else {
+      addTransferOverlay.classList.remove('open');
+    }
+    addTransferOid = null;
+    addTransferTriggerBtn = null;
+  }
+
+  addTransferCloseBtn.addEventListener('click', closeAddTransferModal);
+  addTransferOverlay.addEventListener('click', (e) => {
+    if (e.target === addTransferOverlay) closeAddTransferModal();
+  });
+
+  addTransferSaveBtn.addEventListener('click', () => {
+    if (!addTransferOid) return;
+
+    const transferInfo = {
+      laddress: addTransferFieldValue('AddTILoadingAddress'),
+      lcity: addTransferFieldValue('AddTILoadingCity'),
+      lpostalcode: addTransferFieldValue('AddTILoadingPostalCode'),
+      daddress: addTransferFieldValue('AddTIDestinationAddress'),
+      dcity: addTransferFieldValue('AddTIDestinationCity'),
+      dpostalcode: addTransferFieldValue('AddTIDestinationPostalCode'),
+      dcountry: addTransferFieldValue('AddTIDestinationCountry'),
+      tcompany: addTransferFieldValue('AddTITransportCompany'),
+      tnumber: addTransferFieldValue('AddTITransportNumber'),
+      sdate: addTransferFieldValue('AddTITransferStartDate'),
+      stime: addTransferFieldValue('AddTITransferStartTime')
+    };
+
+    const hasAnyValue = Object.values(transferInfo).some(v => v !== '');
+    if (!hasAnyValue) {
+      alert('Please fill in at least one field.');
+      return;
+    }
+
+    const oid = addTransferOid;
+    const triggerBtn = addTransferTriggerBtn;
+
+    addTransferSaveBtn.disabled = true;
+    addTransferSaveBtn.textContent = 'Saving…';
+
+    fetch('/save_transfer_info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oid, ...transferInfo })
+    })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to save transfer info');
+        return response.json();
+      })
+      .then(data => {
+        if (!data.success) {
+          alert(data.error || 'Failed to save transfer info');
+          return;
+        }
+
+        // Update local data so the View Info modal reflects the new
+        // entry - append it (an invoice can now have several), don't
+        // overwrite whatever was already there.
+        const invoice = findInvoiceByOid(oid);
+        if (invoice) {
+          if (!Array.isArray(invoice.transfer_infos)) invoice.transfer_infos = [];
+          invoice.transfer_infos.push({ transfer_id: data.transfer_id, ...transferInfo });
+        }
+
+        // If the Transfer Info view for this invoice is open right now
+        // (the "Add More" side-by-side flow), refresh it in place so the
+        // new entry shows up immediately.
+        if (invoice && currentTransferViewOid === oid) {
+          renderTransferViewEntries(invoice.transfer_infos);
+        }
+
+        // Swap the "+" button for a "View Info" button in the table.
+        if (triggerBtn) {
+          const cell = triggerBtn.closest('td');
+          if (cell) {
+            cell.innerHTML = `<button type="button" class="view-info-btn" data-oid="${oid}">View Info</button>`;
+          }
+        }
+
+        closeAddTransferModal();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while saving the transfer info.');
+      })
+      .finally(() => {
+        addTransferSaveBtn.disabled = false;
+        addTransferSaveBtn.textContent = 'Save';
+      });
+  });
+
+  // ---- Invoices table: inline editing ----
+  // Only fields that live directly on a single row (date / issue date / status)
+  // are inline-editable here. Customer, document type, and total are derived
+  // from linked records (contact, product lines) and are edited from their
+  // own flows instead, to avoid silently breaking those relationships.
+  const invEditableFieldConfig = {
+    date: { type: 'date' },
+    issue_date: { type: 'date' },
+    status: { type: 'select', options: ['Paid', 'Pending'] }
+  };
+
+  function invCellCurrentValue(cell, field) {
+    if (field === 'status') {
+      const pill = cell.querySelector('.status-pill');
+      return pill ? pill.textContent.trim() : cell.textContent.trim();
+    }
+    return cell.textContent.trim();
+  }
+
+  function invRenderCellValue(cell, field, value) {
+    if (field === 'status') {
+      const isPaid = value === 'Paid';
+      cell.innerHTML = `<span class="status-pill ${isPaid ? 'paid' : 'pending'}">${value}</span>`;
+    } else {
+      cell.textContent = value;
+    }
+  }
+
+  function makeInvoiceCellEditable(cell) {
+    if (cell.classList.contains('editing')) return;
+
+    const field = cell.dataset.field;
+    const config = invEditableFieldConfig[field];
+    if (!config) return;
+
+    const invoiceId = cell.dataset.invoiceId;
+    const originalValue = invCellCurrentValue(cell, field);
+
+    cell.classList.add('editing');
+
+    let input;
+    if (config.type === 'select') {
+      input = document.createElement('select');
+      config.options.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (opt === originalValue) option.selected = true;
+        input.appendChild(option);
+      });
+    } else {
+      input = document.createElement('input');
+      input.type = config.type;
+      input.value = originalValue;
+    }
+
+    cell.innerHTML = '';
+    cell.appendChild(input);
+    input.focus();
+
+    function saveEdit() {
+      const newValue = input.value.trim();
+      cell.classList.remove('editing');
+
+      if (newValue === originalValue) {
+        invRenderCellValue(cell, field, originalValue);
+        return;
+      }
+
+      invRenderCellValue(cell, field, newValue);
+      if (field === 'date' || field === 'issue_date') {
+        const row = cell.closest('tr.inv-row');
+        if (row) row.dataset[field === 'date' ? 'date' : 'issueDate'] = newValue;
+      }
+
+      fetch('/update_invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoice_id: invoiceId,
+          field: field,
+          value: newValue
+        })
+      })
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to update invoice');
+          return response.json();
+        })
+        .then(data => {
+          if (!data.success) {
+            invRenderCellValue(cell, field, originalValue);
+            if (field === 'date' || field === 'issue_date') {
+              const row = cell.closest('tr.inv-row');
+              if (row) row.dataset[field === 'date' ? 'date' : 'issueDate'] = originalValue;
+            }
+            alert(data.error || 'Failed to update invoice');
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          invRenderCellValue(cell, field, originalValue);
+          if (field === 'date' || field === 'issue_date') {
+            const row = cell.closest('tr.inv-row');
+            if (row) row.dataset[field === 'date' ? 'date' : 'issueDate'] = originalValue;
+          }
+          alert('Something went wrong while saving.');
+        });
+    }
+
+    function cancelEdit() {
+      cell.classList.remove('editing');
+      invRenderCellValue(cell, field, originalValue);
+    }
+
+    if (config.type === 'select') {
+      input.addEventListener('change', saveEdit);
+      input.addEventListener('blur', saveEdit);
+    } else {
+      input.addEventListener('blur', saveEdit);
+    }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        input.blur();
+      } else if (e.key === 'Escape') {
+        cancelEdit();
+      }
+    });
+  }
+
+  // ---- Invoices table: Remove, edit, and view transfer info ----
+  const invoicesTableBody = document.getElementById('invoicesTableBody');
+
+  invoicesTableBody.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+      const invoiceId = removeBtn.dataset.invoiceId;
+      deleteInvoice(invoiceId, removeBtn);
+      return;
+    }
+
+    const viewInfoBtn = e.target.closest('.view-info-btn');
+    if (viewInfoBtn) {
+      openTransferView(viewInfoBtn.dataset.oid);
+      return;
+    }
+
+    const addTransferBtn = e.target.closest('.add-transfer-btn');
+    if (addTransferBtn) {
+      openAddTransferModal(addTransferBtn.dataset.oid, addTransferBtn);
+      return;
+    }
+
+    const viewInvoiceBtn = e.target.closest('.view-invoice-btn');
+    if (viewInvoiceBtn) {
+      openInvoiceView(viewInvoiceBtn.dataset.invoiceId);
+      return;
+    }
+
+    const pdfInvoiceBtn = e.target.closest('.pdf-invoice-btn');
+    if (pdfInvoiceBtn) {
+      openInvoicePdf(pdfInvoiceBtn.dataset.invoiceId);
+      return;
+    }
+
+    const cell = e.target.closest('.editable-cell');
+    if (cell && !cell.classList.contains('editing')) {
+      makeInvoiceCellEditable(cell);
+    }
+  });
+
+  function toggleNoInvoicesRow() {
+    const hasRows = invoicesTableBody.querySelectorAll('tr.inv-row').length > 0;
+    let noInvoicesRow = document.getElementById('no-invoices-row');
+
+    if (!hasRows && !noInvoicesRow) {
+      noInvoicesRow = document.createElement('tr');
+      noInvoicesRow.className = 'no-products-row';
+      noInvoicesRow.id = 'no-invoices-row';
+      noInvoicesRow.innerHTML = '<td colspan="10">No invoices available.</td>';   // colspan updated
+      invoicesTableBody.appendChild(noInvoicesRow);
+    } else if (hasRows && noInvoicesRow) {
+      noInvoicesRow.remove();
+    }
+  }
+
+  function deleteInvoice(invoiceId, removeBtn) {
+    if (!confirm('Remove this invoice? This cannot be undone.')) return;
+
+    removeBtn.disabled = true;
+
+    fetch('/delete_invoice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoice_id: invoiceId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to delete invoice');
+        }
+
+        const row = invoicesTableBody.querySelector(`tr.inv-row[data-invoice-id="${invoiceId}"]`);
+        if (row) row.remove();
+
+        const idx = invoicesData.findIndex((inv, i) => String((inv.id !== undefined) ? inv.id : i) === String(invoiceId));
+        if (idx !== -1) invoicesData.splice(idx, 1);
+
+        toggleNoInvoicesRow();
+        filterInvoices();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while removing the invoice.');
+        removeBtn.disabled = false;
+      });
+  }
+
+  // ---- Search / filter ----
+  const invSearchInput = document.getElementById('inv-search-input');
+
+  function toggleNoSearchResultsRow(show) {
+    let row = document.getElementById('no-search-results-row');
+    if (show && !row) {
+      row = document.createElement('tr');
+      row.className = 'no-products-row';
+      row.id = 'no-search-results-row';
+      row.innerHTML = '<td colspan="10">No matching invoices found</td>';   // colspan updated
+      invoicesTableBody.appendChild(row);
+    } else if (!show && row) {
+      row.remove();
+    }
+  }
+
+  function filterInvoices() {
+    const term = invSearchInput.value.trim().toLowerCase();
+    const rows = invoicesTableBody.querySelectorAll('tr.inv-row');
+
+    if (rows.length === 0) {
+      toggleNoSearchResultsRow(false);
+      return;
+    }
+
+    let anyVisible = false;
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    toggleNoSearchResultsRow(!anyVisible);
+  }
+
+  invSearchInput.addEventListener('input', filterInvoices);
+
+  // ---- Sort dropdown (defaults to Issue Date - Newest First) ----
+  const invSortSelect = document.getElementById('inv-sort-select');
+
+  function sortInvoiceRows() {
+    const sortValue = invSortSelect.value || 'issue_date_desc';
+    const rows = Array.from(invoicesTableBody.querySelectorAll('tr.inv-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'name_asc' || sortValue === 'name_desc') {
+        const nameA = (a.dataset.customer || '').toLowerCase();
+        const nameB = (b.dataset.customer || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortValue === 'name_asc' ? cmp : -cmp;
+      } else if (sortValue === 'total_asc' || sortValue === 'total_desc') {
+        const totalA = parseFloat(a.dataset.total) || 0;
+        const totalB = parseFloat(b.dataset.total) || 0;
+        return sortValue === 'total_asc' ? totalA - totalB : totalB - totalA;
+      } else if (sortValue === 'date_asc' || sortValue === 'date_desc') {
+        const timeA = Date.parse(a.dataset.date) || 0;
+        const timeB = Date.parse(b.dataset.date) || 0;
+        return sortValue === 'date_asc' ? timeA - timeB : timeB - timeA;
+      } else {
+        const timeA = Date.parse(a.dataset.issueDate) || 0;
+        const timeB = Date.parse(b.dataset.issueDate) || 0;
+        return sortValue === 'issue_date_asc' ? timeA - timeB : timeB - timeA;
+      }
+    });
+
+    rows.forEach(row => invoicesTableBody.appendChild(row));
+  }
+
+  invSortSelect.addEventListener('change', sortInvoiceRows);
+
+  // Apply the default sort (Issue Date - Newest First) as soon as the page loads
+  sortInvoiceRows();
+
+
+  // ---- NEW: Scan With AI functionality ----
+  (function() {
+    const aiModal = document.getElementById('scanAIModal');
+    const openAiBtn = document.getElementById('openAIScanBtn');
+    const aiCancelBtn = document.getElementById('aiCancelBtn');
+    const aiFileInput = document.getElementById('aiFileInput');
+    const aiDropZone = document.getElementById('aiDropZone');
+    const aiFileInfo = document.getElementById('aiFileInfo');
+    const aiProcessBtn = document.getElementById('aiProcessBtn');
+    const dropOverlay = document.getElementById('dropOverlay');
+    const aiProgressWrap = document.getElementById('aiScanProgressWrap');
+    const aiProgressFill = document.getElementById('aiScanProgressFill');
+    const aiProgressPct = document.getElementById('aiScanProgressPct');
+    const aiProgressText = document.getElementById('aiScanProgressText');
+    let aiProgressTimer = null;
+
+    // --- Fake progress bar: fills over ~30s, then holds at 100% until the
+    // real request finishes (success, error, or otherwise) ---
+    function startAIProgress() {
+      const duration = 30000; // 30 seconds
+      const start = Date.now();
+      clearInterval(aiProgressTimer);
+      aiProgressWrap.style.display = 'block';
+      aiProgressFill.style.width = '0%';
+      aiProgressPct.textContent = '0%';
+      aiProgressText.textContent = 'Analyzing invoice…';
+      aiDropZone.style.opacity = '0.5';
+      aiDropZone.style.pointerEvents = 'none';
+
+      aiProgressTimer = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const pct = Math.min(100, Math.floor((elapsed / duration) * 100));
+        aiProgressFill.style.width = pct + '%';
+        aiProgressPct.textContent = pct + '%';
+        if (pct >= 100) {
+          aiProgressText.textContent = 'Finishing up…';
+          clearInterval(aiProgressTimer);
+          aiProgressTimer = null;
+        }
+      }, 200);
+    }
+
+    function stopAIProgress() {
+      if (aiProgressTimer) {
+        clearInterval(aiProgressTimer);
+        aiProgressTimer = null;
+      }
+      aiProgressWrap.style.display = 'none';
+      aiProgressFill.style.width = '0%';
+      aiProgressPct.textContent = '0%';
+      aiDropZone.style.opacity = '';
+      aiDropZone.style.pointerEvents = '';
+    }
+
+    // --- Scan Confirm Modal elements ---
+    const scanConfirmModal = document.getElementById('scanConfirmModal');
+    const scanConfirmCancelBtn = document.getElementById('scanConfirmCancelBtn');
+    const scanConfirmOkBtn = document.getElementById('scanConfirmOkBtn');
+    const scanConfirmMeta = document.getElementById('scan-confirm-meta');
+    const scanConfirmProductsBody = document.getElementById('scan-confirm-products-body');
+    const scanConfirmTotalAmount = document.getElementById('scan-confirm-total-amount');
+
+    function closeScanConfirmModal() {
+      scanConfirmModal.classList.remove('open');
+    }
+
+    scanConfirmCancelBtn.addEventListener('click', closeScanConfirmModal);
+    scanConfirmModal.addEventListener('click', (e) => {
+      if (e.target === scanConfirmModal) closeScanConfirmModal();
+    });
+
+    // --- Save Contact Modal elements ---
+    const saveContactModal = document.getElementById('saveContactModal');
+    const saveContactTitle = document.getElementById('saveContactTitle');
+    const saveContactMeta = document.getElementById('save-contact-meta');
+    const saveContactSkipBtn = document.getElementById('saveContactSkipBtn');
+    const saveContactSaveBtn = document.getElementById('saveContactSaveBtn');
+
+    let selectedFile = null;
+    let isAIModalOpen = false;
+    let currentScannedData = null;
+    let pendingMissingContacts = [];
+    let currentMissingContact = null;
+
+    // --- helpers ---
+    function esc(value) {
+      const div = document.createElement('div');
+      div.textContent = (value === null || value === undefined) ? '' : String(value);
+      return div.innerHTML;
+    }
+
+    // --- AI modal open/close ---
+    function openAIModal() {
+      aiModal.classList.add('open');
+      isAIModalOpen = true;
+      selectedFile = null;
+      aiFileInput.value = '';
+      aiFileInfo.style.display = 'none';
+      aiFileInfo.textContent = '';
+      aiProcessBtn.disabled = true;
+      aiDropZone.classList.remove('dragover');
+      stopAIProgress();
+    }
+
+    function closeAIModal() {
+      aiModal.classList.remove('open');
+      isAIModalOpen = false;
+      dropOverlay.classList.remove('active');
+      stopAIProgress();
+    }
+
+    openAiBtn.addEventListener('click', openAIModal);
+    aiCancelBtn.addEventListener('click', closeAIModal);
+    aiModal.addEventListener('click', (e) => {
+      if (e.target === aiModal) closeAIModal();
+    });
+
+    // --- drop-zone file picking ---
+    aiDropZone.addEventListener('click', () => aiFileInput.click());
+
+    aiFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) handleFile(file);
+    });
+
+    aiDropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      aiDropZone.classList.add('dragover');
+    });
+    aiDropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      aiDropZone.classList.remove('dragover');
+    });
+    aiDropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      aiDropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          handleFile(file);
+        } else {
+          alert('Only PDF files are accepted.');
+        }
+      }
+    });
+
+    // --- global drag (full-screen overlay) ---
+    document.addEventListener('dragover', (e) => {
+      if (!isAIModalOpen) return;
+      e.preventDefault();
+      dropOverlay.classList.add('active');
+    });
+    document.addEventListener('dragleave', (e) => {
+      if (!isAIModalOpen) return;
+      if (e.relatedTarget === null) dropOverlay.classList.remove('active');
+    });
+    document.addEventListener('drop', (e) => {
+      if (!isAIModalOpen) return;
+      e.preventDefault();
+      dropOverlay.classList.remove('active');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          handleFile(file);
+        } else {
+          alert('Only PDF files are accepted.');
+        }
+      }
+    });
+
+    function handleFile(file) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        alert('Only PDF files are accepted.');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size exceeds 10 MB limit.');
+        return;
+      }
+      selectedFile = file;
+      aiFileInfo.style.display = 'block';
+      aiFileInfo.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      aiProcessBtn.disabled = false;
+    }
+
+    // --- Save Contact Modal flow ---
+    function openSaveContactModal(contact) {
+      currentMissingContact = contact;
+      saveContactTitle.textContent = contact.type === 'vendor' ? 'Save New Supplier?' : 'Save New Customer?';
+      saveContactMeta.innerHTML = `
+        <div><span class="label">Name</span><span class="value">${esc(contact.name || '-')}</span></div>
+        <div><span class="label">VAT Number</span><span class="value">${esc(contact.afm || '-')}</span></div>
+        <div><span class="label">Address</span><span class="value">${esc(contact.address || '-')}</span></div>
+        <div><span class="label">City</span><span class="value">${esc(contact.city || '-')}</span></div>
+        <div><span class="label">Postal Code</span><span class="value">${esc(contact.postal_code || '-')}</span></div>
+        <div><span class="label">Country</span><span class="value">${esc(contact.country || '-')}</span></div>
+        <div><span class="label">Phone</span><span class="value">${esc(contact.phone || '-')}</span></div>
+        <div><span class="label">Email</span><span class="value">${esc(contact.email || '-')}</span></div>
+      `;
+      saveContactModal.classList.add('open');
+    }
+
+    function closeSaveContactModal() {
+      saveContactModal.classList.remove('open');
+      currentMissingContact = null;
+    }
+
+    function processNextMissingContact() {
+      if (pendingMissingContacts.length > 0) {
+        const next = pendingMissingContacts.shift();
+        openSaveContactModal(next);
+      } else {
+        // All contacts handled → show invoice confirmation
+        if (currentScannedData) {
+          openScanConfirmModal({ invoice_data: currentScannedData });
+        }
+      }
+    }
+
+    saveContactSkipBtn.addEventListener('click', () => {
+      closeSaveContactModal();
+      processNextMissingContact();
+    });
+
+    saveContactSaveBtn.addEventListener('click', async () => {
+      if (!currentMissingContact) return;
+
+      saveContactSaveBtn.disabled = true;
+      saveContactSaveBtn.textContent = 'Saving…';
+
+      try {
+        const response = await fetch('/save_scanned_contact', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentMissingContact)
+        });
+        const result = await response.json();
+        if (!result.success) {
+          alert(`Error saving contact: ${result.error}`);
+        }
+      } catch (err) {
+        alert(`Save contact failed: ${err.message}`);
+      } finally {
+        saveContactSaveBtn.disabled = false;
+        saveContactSaveBtn.textContent = 'Save';
+        closeSaveContactModal();
+        processNextMissingContact();
+      }
+    });
+
+    saveContactModal.addEventListener('click', (e) => {
+      if (e.target === saveContactModal) {
+        closeSaveContactModal();
+        processNextMissingContact();
+      }
+    });
+
+    // --- Scan Confirm Modal (editable) ---
+  let scanProductCounter = 0;
+
+  // --- Click-to-edit for the top meta fields (Document Type, Date, etc.) ---
+  function scanMetaFieldLabelForSelect(select) {
+    const opt = select.options[select.selectedIndex];
+    return opt ? opt.text : select.value;
+  }
+
+  function scanRefreshMetaFieldDisplay(field) {
+    const input = field.querySelector('.value-input');
+    const display = field.querySelector('.value-display');
+    if (!input || !display) return;
+
+    let text;
+    if (input.tagName === 'SELECT') {
+      const rawText = field.dataset.rawText;
+      text = rawText ? rawText : scanMetaFieldLabelForSelect(input);
+      display.classList.remove('placeholder');
+    } else {
+      const val = (input.value || '').trim();
+      text = val === '' ? 'Not set' : val;
+      display.classList.toggle('placeholder', val === '');
+    }
+    display.textContent = text;
+  }
+
+  function scanEnterMetaFieldEdit(field) {
+    if (field.classList.contains('editing')) return;
+    const input = field.querySelector('.value-input');
+    const display = field.querySelector('.value-display');
+    field.classList.add('editing');
+    display.style.display = 'none';
+    input.style.display = 'block';
+    input.focus();
+    if (input.select) input.select();
+  }
+
+  function scanExitMetaFieldEdit(field) {
+    const input = field.querySelector('.value-input');
+    const display = field.querySelector('.value-display');
+    field.classList.remove('editing');
+    input.style.display = 'none';
+    display.style.display = 'block';
+    scanRefreshMetaFieldDisplay(field);
+  }
+
+  document.querySelectorAll('#scan-confirm-meta .scan-field').forEach(field => {
+    const input = field.querySelector('.value-input');
+    scanRefreshMetaFieldDisplay(field);
+
+    field.addEventListener('click', () => scanEnterMetaFieldEdit(field));
+
+    input.addEventListener('blur', () => scanExitMetaFieldEdit(field));
+    if (input.tagName === 'SELECT') {
+      input.addEventListener('change', () => {
+        // The user has now explicitly chosen a real option, so the raw
+        // scanned-text override (if any) no longer applies.
+        field.dataset.rawText = '';
+        scanExitMetaFieldEdit(field);
+      });
+    } else {
+      input.addEventListener('input', () => scanRefreshMetaFieldDisplay(field));
+    }
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === 'Escape') {
+        input.blur();
+      }
+    });
+    // Don't let clicks inside the input bubble back up and re-trigger edit mode.
+    input.addEventListener('click', (e) => e.stopPropagation());
+  });
+
+  function scanComputeTotal() {
+    const rows = document.querySelectorAll('#scan-confirm-products-body tr.product-row');
+    let total = 0;
+    rows.forEach(row => {
+      const subtotalCell = row.querySelector('.subtotal-cell');
+      if (subtotalCell) {
+        const val = parseFloat(subtotalCell.dataset.value) || 0;
+        total += val;
+      }
+    });
+    document.getElementById('scan-confirm-total-amount').textContent = formatMoney(total);
+  }
+
+  function scanUpdateSubtotal(row) {
+    const priceInput = row.querySelector('.price-input');
+    const qtyInput = row.querySelector('.qty-input');
+    const subtotalCell = row.querySelector('.subtotal-cell');
+    const price = parseFloat(priceInput.value) || 0;
+    const qty = parseInt(qtyInput.value) || 0;
+    const subtotal = price * qty;
+    subtotalCell.textContent = formatMoney(subtotal);
+    subtotalCell.dataset.value = subtotal.toFixed(2);
+    scanComputeTotal();
+  }
+
+  function scanCellDisplayText(input, placeholder) {
+    const val = (input.value || '').toString().trim();
+    return val === '' ? placeholder : val;
+  }
+
+  function scanRefreshCellDisplay(cell) {
+    const input = cell.querySelector('.value-input');
+    const display = cell.querySelector('.value-display');
+    if (!input || !display) return;
+    const placeholder = input.placeholder || '—';
+    const text = scanCellDisplayText(input, placeholder);
+    display.textContent = text;
+    display.classList.toggle('placeholder', text === placeholder && (input.value || '').trim() === '');
+  }
+
+  function scanEnterCellEdit(cell) {
+    if (cell.classList.contains('editing')) return;
+    const input = cell.querySelector('.value-input');
+    const display = cell.querySelector('.value-display');
+    cell.classList.add('editing');
+    display.style.display = 'none';
+    input.style.display = 'block';
+    input.focus();
+    if (input.select) input.select();
+  }
+
+  function scanExitCellEdit(cell) {
+    const input = cell.querySelector('.value-input');
+    const display = cell.querySelector('.value-display');
+    cell.classList.remove('editing');
+    input.style.display = 'none';
+    display.style.display = 'block';
+    scanRefreshCellDisplay(cell);
+  }
+
+  function scanWireCellClickToEdit(cell) {
+    const input = cell.querySelector('.value-input');
+    scanRefreshCellDisplay(cell);
+
+    cell.addEventListener('click', () => scanEnterCellEdit(cell));
+
+    input.addEventListener('blur', () => scanExitCellEdit(cell));
+    input.addEventListener('input', () => scanRefreshCellDisplay(cell));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      } else if (e.key === 'Escape') {
+        input.blur();
+      }
+    });
+    // Prevent the cell's click handler from re-triggering edit mode while
+    // interacting with the input itself.
+    input.addEventListener('click', (e) => e.stopPropagation());
+  }
+
+  function scanAddProductRow(name = '', price = '', lot = '', qty = 1) {
+    scanProductCounter++;
+    const tbody = document.getElementById('scan-confirm-products-body');
+    const row = document.createElement('tr');
+    row.className = 'product-row';
+    row.dataset.rowId = 'scan-row-' + scanProductCounter;
+
+    row.innerHTML = `
+      <td class="scan-cell" data-field="name">
+        <span class="value-display"></span>
+        <input type="text" class="name-input value-input" value="${esc(name)}" placeholder="Product name" style="display:none;">
+      </td>
+      <td class="scan-cell" data-field="price">
+        <span class="value-display"></span>
+        <input type="number" class="price-input value-input" step="0.01" min="0" value="${esc(price)}" placeholder="0.00" style="display:none;">
+      </td>
+      <td class="scan-cell" data-field="lot">
+        <span class="value-display"></span>
+        <input type="text" class="lot-input value-input" value="${esc(lot)}" placeholder="LOT #" style="display:none;">
+      </td>
+      <td class="scan-cell" data-field="qty">
+        <span class="value-display"></span>
+        <input type="number" class="qty-input value-input" min="1" value="${esc(qty)}" style="display:none;">
+      </td>
+      <td class="subtotal-cell" data-value="0">${formatMoney(0)}</td>
+      <td><button type="button" class="remove-btn scan-remove-product">Remove</button></td>
+    `;
+
+    // Event listeners for price/qty changes
+    const priceInput = row.querySelector('.price-input');
+    const qtyInput = row.querySelector('.qty-input');
+    const removeBtn = row.querySelector('.scan-remove-product');
+
+    priceInput.addEventListener('input', () => scanUpdateSubtotal(row));
+    qtyInput.addEventListener('input', () => scanUpdateSubtotal(row));
+
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+      scanComputeTotal();
+    });
+
+    // Make every field in this row click-to-edit.
+    row.querySelectorAll('.scan-cell').forEach(scanWireCellClickToEdit);
+
+    tbody.appendChild(row);
+    scanUpdateSubtotal(row);
+  }
+
+  function openScanConfirmModal(data) {
+    currentScannedData = data.invoice_data || {};
+    const inv = currentScannedData;
+
+    // Populate meta fields
+    document.getElementById('scan-doc-type').value = inv.document_type || 'sales_invoice';
+    document.getElementById('scan-date').value = inv.date || '';
+    document.getElementById('scan-issue-date').value = inv.issue_date || inv.date || '';
+    document.getElementById('scan-customer').value = inv.customer_name || '';
+    document.getElementById('scan-customer-vat').value = inv.customer_vat || inv.customer_afm || '';
+    const statusSelect = document.getElementById('scan-status');
+    const rawStatus = (inv.status || 'Pending').toString();
+    const statusMatches = Array.from(statusSelect.options).some(opt => opt.value === rawStatus);
+    // The dropdown only understands Paid / Pending. If the scanned text doesn't
+    // match either (e.g. "Pending Payment" from OCR), default the underlying
+    // select to Pending but show the raw scanned text until the user clicks in
+    // and picks one of the real options.
+    statusSelect.value = statusMatches ? rawStatus : 'Pending';
+    statusSelect.closest('.scan-field').dataset.rawText = statusMatches ? '' : rawStatus;
+
+    // Reflect the populated values in their (currently hidden) display spans,
+    // and make sure every field starts back in "display" (not editing) mode.
+    document.querySelectorAll('#scan-confirm-meta .scan-field').forEach(field => {
+      field.classList.remove('editing');
+      const input = field.querySelector('.value-input');
+      const display = field.querySelector('.value-display');
+      if (input) input.style.display = 'none';
+      if (display) display.style.display = 'block';
+      scanRefreshMetaFieldDisplay(field);
+    });
+
+    // Populate products
+    const tbody = document.getElementById('scan-confirm-products-body');
+    tbody.innerHTML = ''; // clear
+    const products = inv.products || [];
+    if (products.length === 0) {
+      // Add one empty row as default
+      scanAddProductRow('', '', '', 1);
+    } else {
+      products.forEach(p => {
+        const name = p.name || '';
+        const price = p.price || 0;
+        const lot = p.lot || p.lot_number || '';
+        const qty = p.quantity || 1;
+        scanAddProductRow(name, price, lot, qty);
+      });
+    }
+
+    scanConfirmModal.classList.add('open');
+  }
+
+  // Add product button
+  document.getElementById('scan-add-product-btn').addEventListener('click', () => {
+    scanAddProductRow('', '', '', 1);
+  });
+
+  // --- OK button: gather data and send ---
+  scanConfirmOkBtn.addEventListener('click', async () => {
+    // Gather metadata
+    const docType = document.getElementById('scan-doc-type').value;
+    const date = document.getElementById('scan-date').value;
+    const issueDate = document.getElementById('scan-issue-date').value;
+    const customerName = document.getElementById('scan-customer').value.trim();
+    const customerVat = document.getElementById('scan-customer-vat').value.trim();
+    const status = document.getElementById('scan-status').value;
+
+    // Gather products
+    const productRows = document.querySelectorAll('#scan-confirm-products-body tr.product-row');
+    const products = [];
+    let total = 0;
+    productRows.forEach(row => {
+      const name = row.querySelector('.name-input').value.trim();
+      const price = parseFloat(row.querySelector('.price-input').value) || 0;
+      const lot = row.querySelector('.lot-input').value.trim();
+      const qty = parseInt(row.querySelector('.qty-input').value) || 0;
+      if (name && qty > 0) {
+        const subtotal = price * qty;
+        total += subtotal;
+        products.push({ name, price, lot, quantity: qty, subtotal });
+      }
+    });
+
+    if (products.length === 0) {
+      alert('Please add at least one product.');
+      return;
+    }
+
+    // Build the invoice data object (similar structure)
+    const invoiceData = {
+      document_type: docType,
+      date: date,
+      issue_date: issueDate || date,
+      customer_name: customerName,
+      customer_vat: customerVat,
+      status: status,
+      products: products,
+      total: total
+    };
+
+    // Disable button and send
+    scanConfirmOkBtn.disabled = true;
+    scanConfirmOkBtn.textContent = 'Saving…';
+
+    try {
+      const response = await fetch('/save_scanned_invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoice_data: invoiceData })
+      });
+      const result = await response.json();
+      if (result.success) {
+        closeScanConfirmModal();
+        closeAIModal();
+        window.location.reload();
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (err) {
+      alert(`Save failed: ${err.message}`);
+    } finally {
+      scanConfirmOkBtn.disabled = false;
+      scanConfirmOkBtn.textContent = 'OK';
+    }
+  });
+
+    // --- Process button ---
+    aiProcessBtn.addEventListener('click', async () => {
+      if (!selectedFile) {
+        alert('Please select a PDF file first.');
+        return;
+      }
+
+      aiProcessBtn.disabled = true;
+      aiProcessBtn.textContent = 'Processing…';
+      startAIProgress();
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      try {
+        const response = await fetch('/scan_invoice', { method: 'POST', body: formData });
+        const data = await response.json();
+
+        if (data.success) {
+          if (data.missing_contacts && data.missing_contacts.length > 0) {
+            // Close scan modal and walk through missing contacts first
+            scannedInvoiceData = data.invoice_data;
+            currentScannedData = data.invoice_data;
+            pendingMissingContacts = [...data.missing_contacts];
+            closeAIModal();
+            processNextMissingContact();
+          } else if (data.invoice_data) {
+            openScanConfirmModal(data);
+          } else {
+            alert('Scan completed, but no structured data could be extracted.\n\nRaw text preview:\n' + data.text.slice(0, 600));
+          }
+        } else {
+          alert(`Error: ${data.error}`);
+        }
+      } catch (error) {
+        alert(`Request failed: ${error.message}`);
+      } finally {
+        aiProcessBtn.disabled = false;
+        aiProcessBtn.textContent = 'Process';
+        stopAIProgress();
+      }
+    });
+
+    window.addEventListener('beforeunload', () => {
+      dropOverlay.classList.remove('active');
+    });
+  })();
+
+</script>
+
+{% endblock %}

@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Let's Get Started</title>
+<style>
+  :root{
+    --ink:#0b1215;
+    --ink-hover:#3b3b3b;
+    --accent:#f5a623;
+    --text-muted:#8a94a6;
+    --border:#e3e6ec;
+    --bg:#eef1f6;
+    --danger:#e0453c;
+    --ok:#2fa860;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    height:100%;
+    font-family:"Segoe UI", Arial, sans-serif;
+    background:var(--bg);
+    color:#333;
+  }
+
+  /* ---- page behind the modal, just so the demo has context ---- */
+  .demo-backdrop{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:40px 16px;
+  }
+  .demo-card{
+    max-width:420px;
+    text-align:center;
+    color:var(--text-muted);
+  }
+  .demo-card h1{
+    color:var(--ink);
+    font-size:22px;
+    margin-bottom:8px;
+  }
+
+  /* ================= ONBOARDING OVERLAY ================= */
+  .ob-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(11,18,21,0.55);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:2000;
+    padding:20px;
+  }
+
+  .ob-modal{
+    width:560px;
+    max-width:100%;
+    max-height:92vh;
+    background:#fff;
+    border-radius:16px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.35);
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---- flash messages ---- */
+  .ob-flash{
+    padding:14px 30px 0;
+  }
+  .ob-flash-msg{
+    background:#fdecea;
+    color:var(--danger);
+    border:1px solid #f6c8c4;
+    border-radius:8px;
+    padding:10px 14px;
+    font-size:13px;
+    margin-bottom:10px;
+  }
+
+  /* ---- header ---- */
+  .ob-head{
+    padding:26px 30px 0;
+  }
+  .ob-eyebrow{
+    font-size:12px;
+    font-weight:700;
+    color:var(--accent);
+    letter-spacing:0.02em;
+    margin:0 0 4px;
+  }
+  .ob-title{
+    font-size:21px;
+    font-weight:700;
+    color:var(--ink);
+    margin:0 0 6px;
+  }
+  .ob-subtitle{
+    font-size:13.5px;
+    color:var(--text-muted);
+    margin:0 0 20px;
+    line-height:1.5;
+  }
+
+  /* ---- progress ---- */
+  .ob-progress-wrap{
+    padding:0 30px 18px;
+  }
+  .ob-progress-track{
+    height:6px;
+    background:var(--border);
+    border-radius:999px;
+    overflow:hidden;
+  }
+  .ob-progress-fill{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg, var(--accent), #ffcf80);
+    border-radius:999px;
+    transition:width .35s ease;
+  }
+  .ob-steps{
+    display:flex;
+    justify-content:space-between;
+    margin-top:12px;
+  }
+  .ob-step{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:12.5px;
+    color:var(--text-muted);
+  }
+  .ob-step-dot{
+    width:22px;
+    height:22px;
+    flex:0 0 auto;
+    border-radius:50%;
+    background:var(--border);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    font-weight:700;
+    transition:background .2s ease, color .2s ease;
+  }
+  .ob-step.is-active .ob-step-dot{
+    background:var(--ink);
+  }
+  .ob-step.is-done .ob-step-dot{
+    background:var(--ok);
+  }
+  .ob-step.is-active span.ob-step-label{ color:var(--ink); font-weight:600; }
+  .ob-step-label{ display:none; }
+  @media (min-width:480px){
+    .ob-step-label{ display:inline; }
+  }
+
+  /* ---- body / panels ---- */
+  .ob-body{
+    padding:6px 30px 4px;
+    overflow-y:auto;
+    flex:1;
+  }
+  .ob-panel{ display:none; }
+  .ob-panel.is-active{ display:block; animation:obFade .2s ease; }
+  @keyframes obFade{
+    from{ opacity:0; transform:translateY(4px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+
+  .ob-panel-heading{
+    font-size:13px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:#9aa5b8;
+    margin:14px 0 16px;
+  }
+
+  .ob-field-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:16px;
+    margin-bottom:16px;
+  }
+  .ob-field-row.single{
+    grid-template-columns:1fr;
+  }
+  .ob-field label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    color:#4a5568;
+    margin-bottom:6px;
+  }
+  .ob-field label .req{
+    color:var(--accent);
+    margin-left:2px;
+  }
+  .ob-field input[type="text"],
+  .ob-field input[type="email"],
+  .ob-field input[type="tel"],
+  .ob-field select{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-size:14px;
+    font-family:inherit;
+    background:#fff;
+    color:#111;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .ob-field select{
+    appearance:none;
+    -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat:no-repeat;
+    background-position:right 12px center;
+    background-size:16px;
+    cursor:pointer;
+  }
+  .ob-field input:focus,
+  .ob-field select:focus{
+    outline:none;
+    border-color:var(--ink);
+    box-shadow:0 0 0 3px rgba(11,18,21,0.08);
+  }
+  .ob-field.has-error input,
+  .ob-field.has-error select{
+    border-color:var(--danger);
+  }
+  .ob-error-msg{
+    display:none;
+    font-size:11.5px;
+    color:var(--danger);
+    margin-top:5px;
+  }
+  .ob-field.has-error .ob-error-msg{ display:block; }
+
+  /* ---- logo upload ---- */
+  .ob-logo-row{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .ob-logo-drop{
+    width:76px;
+    height:76px;
+    flex:0 0 auto;
+    border-radius:50%;
+    border:2px dashed var(--border);
+    background:var(--bg);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+    transition:border-color .15s ease;
+  }
+  .ob-logo-drop:hover{ border-color:var(--accent); }
+  .ob-logo-drop img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:none;
+  }
+  .ob-logo-drop .ob-logo-icon{
+    font-size:22px;
+    color:#b7bfcc;
+  }
+  .ob-logo-drop input[type=file]{
+    position:absolute;
+    inset:0;
+    opacity:0;
+    cursor:pointer;
+  }
+  .ob-logo-meta strong{
+    display:block;
+    font-size:13.5px;
+    color:var(--ink);
+    margin-bottom:3px;
+  }
+  .ob-logo-meta span{
+    font-size:12px;
+    color:var(--text-muted);
+  }
+  .ob-logo-remove{
+    display:none;
+    background:none;
+    border:none;
+    color:var(--danger);
+    font-size:12px;
+    padding:0;
+    margin-top:4px;
+    cursor:pointer;
+    text-decoration:underline;
+  }
+
+  /* ---- review panel ---- */
+  .ob-review-list{
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow:hidden;
+    margin-bottom:8px;
+  }
+  .ob-review-row{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:11px 16px;
+    font-size:13.5px;
+    border-bottom:1px solid var(--border);
+  }
+  .ob-review-row:last-child{ border-bottom:none; }
+  .ob-review-row .k{ color:var(--text-muted); }
+  .ob-review-row .v{ color:#111; font-weight:600; text-align:right; }
+
+  /* ---- footer ---- */
+  .ob-foot{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:20px 30px 26px;
+    border-top:1px solid var(--border);
+    margin-top:10px;
+  }
+  .ob-foot-left{
+    font-size:12px;
+    color:var(--text-muted);
+  }
+  .ob-foot-actions{
+    display:flex;
+    gap:10px;
+  }
+  .ob-btn{
+    border:none;
+    padding:11px 22px;
+    border-radius:8px;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:opacity .15s ease, background .15s ease;
+  }
+  .ob-btn-primary{
+    background:var(--ink);
+    color:#fff;
+  }
+  .ob-btn-primary:hover{ background:var(--ink-hover); }
+  .ob-btn-secondary{
+    background:#fff;
+    color:var(--ink);
+    border:1px solid var(--border);
+  }
+  .ob-btn-secondary:hover{ background:var(--bg); }
+  .ob-btn:disabled{
+    opacity:0.5;
+    cursor:not-allowed;
+  }
+
+  /* ---- success state ---- */
+  .ob-success{
+    display:none;
+    text-align:center;
+    padding:50px 30px 44px;
+  }
+  .ob-success.is-active{ display:block; }
+  .ob-success .ob-success-icon{
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    background:#e7f7ee;
+    color:var(--ok);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:28px;
+    margin:0 auto 18px;
+  }
+  .ob-success h2{
+    font-size:19px;
+    color:var(--ink);
+    margin:0 0 8px;
+  }
+  .ob-success p{
+    font-size:13.5px;
+    color:var(--text-muted);
+    margin:0 0 24px;
+    line-height:1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="ob-overlay" id="obOverlay">
+  <div class="ob-modal">
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="ob-flash">
+          {% for message in messages %}
+            <div class="ob-flash-msg">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <!-- ===== wizard ===== -->
+    <form id="obWizard" method="POST" action="{{ url_for('onboarding') }}" enctype="multipart/form-data" novalidate>
+      <div class="ob-head">
+        <p class="ob-eyebrow">Welcome</p>
+        <h2 class="ob-title">Let's get you set up</h2>
+        <p class="ob-subtitle">A few details so invoices, orders and reports work with your company's information.</p>
+      </div>
+
+      <div class="ob-progress-wrap">
+        <div class="ob-progress-track">
+          <div class="ob-progress-fill" id="obProgressFill"></div>
+        </div>
+        <div class="ob-steps">
+          <div class="ob-step" data-step="1">
+            <span class="ob-step-dot">1</span>
+            <span class="ob-step-label">Company</span>
+          </div>
+          <div class="ob-step" data-step="2">
+            <span class="ob-step-dot">2</span>
+            <span class="ob-step-label">Contact</span>
+          </div>
+          <div class="ob-step" data-step="3">
+            <span class="ob-step-dot">3</span>
+            <span class="ob-step-label">Location</span>
+          </div>
+          <div class="ob-step" data-step="4">
+            <span class="ob-step-dot">4</span>
+            <span class="ob-step-label">Review</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="ob-body">
+
+        <!-- STEP 1 — Company -->
+        <div class="ob-panel is-active" data-panel="1">
+          <div class="ob-logo-row">
+            <label class="ob-logo-drop" id="obLogoDrop">
+              {% if account.logo %}
+                <img id="obLogoPreview" alt="Company logo preview" src="{{ url_for('uploaded_logo', filename=account.logo) }}" style="display:block;">
+                <span class="ob-logo-icon" id="obLogoIcon" style="display:none;">&#128247;</span>
+              {% else %}
+                <img id="obLogoPreview" alt="Company logo preview">
+                <span class="ob-logo-icon" id="obLogoIcon">&#128247;</span>
+              {% endif %}
+              <input type="file" id="obLogoInput" name="logo" accept="image/*">
+            </label>
+            <div class="ob-logo-meta">
+              <strong>Company logo</strong>
+              <span>PNG, JPG, JPEG or WEBP, up to 5MB. Optional.</span>
+              <button type="button" class="ob-logo-remove" id="obLogoRemove" {% if not account.logo %}style="display:none;"{% endif %}>Remove</button>
+            </div>
+          </div>
+
+          <div class="ob-field-row">
+            <div class="ob-field" data-field="companyName">
+              <label>Company name<span class="req">*</span></label>
+              <input type="text" id="companyName" name="company_name" value="{{ account.name or '' }}" placeholder="e.g. Acme Foods Ltd">
+              <div class="ob-error-msg">Enter your company name.</div>
+            </div>
+            <div class="ob-field" data-field="vatNumber">
+              <label>VAT number<span class="req">*</span></label>
+              <input type="text" id="vatNumber" name="vat" value="{{ account.afm or '' }}" placeholder="e.g. EL123456789">
+              <div class="ob-error-msg">Enter a valid VAT number.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 2 — Contact -->
+        <div class="ob-panel" data-panel="2">
+          <div class="ob-field-row single">
+            <div class="ob-field" data-field="fullName">
+              <label>Your full name<span class="req">*</span></label>
+              <input type="text" id="fullName" name="full_name" value="{{ account.fullname or '' }}" placeholder="e.g. Maria Papadaki">
+              <div class="ob-error-msg">Enter your full name.</div>
+            </div>
+          </div>
+          <div class="ob-field-row">
+            <div class="ob-field" data-field="phone">
+              <label>Phone<span class="req">*</span></label>
+              <input type="tel" id="phone" name="phone" value="{{ account.phone or '' }}" placeholder="e.g. +30 691 234 5678">
+              <div class="ob-error-msg">Enter a phone number.</div>
+            </div>
+            <div class="ob-field" data-field="email">
+              <label>Email address<span class="req">*</span></label>
+              <input type="email" id="email" name="email" value="{{ account.email or '' }}" placeholder="e.g. maria@acme.com">
+              <div class="ob-error-msg">Enter a valid email address.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 — Location -->
+        <div class="ob-panel" data-panel="3">
+          <div class="ob-field-row">
+            <div class="ob-field" data-field="country">
+              <label>Country<span class="req">*</span></label>
+              <select id="country" name="country">
+                <option value="">Select country</option>
+                {% for c in ['Greece','Cyprus','Germany','France','Italy','Spain','Netherlands','United Kingdom','United States','Other'] %}
+                  <option {% if account.country == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+              </select>
+              <div class="ob-error-msg">Select a country.</div>
+            </div>
+            <div class="ob-field" data-field="city">
+              <label>City<span class="req">*</span></label>
+              <input type="text" id="city" name="city" value="{{ account.city or '' }}" placeholder="e.g. Heraklion">
+              <div class="ob-error-msg">Enter your city.</div>
+            </div>
+          </div>
+          <div class="ob-field-row single">
+            <div class="ob-field" data-field="currency">
+              <label>Currency<span class="req">*</span></label>
+              <select id="currency" name="currency">
+                <option value="">Select currency</option>
+                {% for code, label in [('EUR','EUR — Euro (€)'), ('USD','USD — US Dollar ($)'), ('GBP','GBP — British Pound (£)'), ('CHF','CHF — Swiss Franc'), ('JPY','JPY — Japanese Yen (¥)')] %}
+                  <option value="{{ code }}" {% if account.currency == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <div class="ob-error-msg">Select the currency you'll be billing in.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 4 — Review -->
+        <div class="ob-panel" data-panel="4">
+          <p class="ob-panel-heading" style="margin-top:2px;">Confirm your details</p>
+          <div class="ob-review-list" id="obReviewList"></div>
+        </div>
+
+      </div>
+
+      <div class="ob-foot">
+        <div class="ob-foot-left" id="obFootHint">Step 1 of 4</div>
+        <div class="ob-foot-actions">
+          <button type="button" class="ob-btn ob-btn-secondary" id="obBackBtn" style="visibility:hidden;">Back</button>
+          <button type="submit" class="ob-btn ob-btn-primary" id="obNextBtn">Continue</button>
+        </div>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  const fieldsByStep = {
+    1: ['companyName', 'vatNumber'],
+    2: ['fullName', 'phone', 'email'],
+    3: ['country', 'city', 'currency']
+  };
+  const allFields = ['companyName','vatNumber','fullName','phone','email','country','city','currency'];
+  const totalSteps = 4; // 3 data steps + review
+  let currentStep = 1;
+
+  const progressFill = document.getElementById('obProgressFill');
+  const nextBtn = document.getElementById('obNextBtn');
+  const backBtn = document.getElementById('obBackBtn');
+  const footHint = document.getElementById('obFootHint');
+  const stepDots = document.querySelectorAll('.ob-step');
+  const reviewList = document.getElementById('obReviewList');
+
+  function getVal(id){
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+
+  function updateProgress(){
+    const filled = allFields.filter(id => getVal(id) !== '').length;
+    const pct = Math.round((filled / allFields.length) * 100);
+    progressFill.style.width = pct + '%';
+  }
+
+  function updateStepDots(){
+    stepDots.forEach(dot => {
+      const step = parseInt(dot.dataset.step, 10);
+      dot.classList.remove('is-active', 'is-done');
+      if (step < currentStep) dot.classList.add('is-done');
+      else if (step === currentStep) dot.classList.add('is-active');
+    });
+  }
+
+  function showStep(step){
+    document.querySelectorAll('.ob-panel').forEach(p => {
+      p.classList.toggle('is-active', parseInt(p.dataset.panel, 10) === step);
+    });
+    updateStepDots();
+    footHint.textContent = 'Step ' + step + ' of ' + totalSteps;
+    backBtn.style.visibility = step === 1 ? 'hidden' : 'visible';
+    nextBtn.textContent = step === totalSteps ? "Get Started" : 'Continue';
+    if (step === totalSteps) buildReview();
+  }
+
+  function buildReview(){
+    const rows = [
+      ['Company name', getVal('companyName')],
+      ['VAT number', getVal('vatNumber')],
+      ['Full name', getVal('fullName')],
+      ['Phone', getVal('phone')],
+      ['Email', getVal('email')],
+      ['Country', getVal('country')],
+      ['City', getVal('city')],
+      ['Currency', getVal('currency')]
+    ];
+    reviewList.innerHTML = rows.map(([k, v]) =>
+      `<div class="ob-review-row"><span class="k">${k}</span><span class="v">${v || '—'}</span></div>`
+    ).join('');
+  }
+
+  function validateStep(step){
+    const ids = fieldsByStep[step];
+    if (!ids) return true;
+    let valid = true;
+    ids.forEach(id => {
+      const field = document.querySelector(`.ob-field[data-field="${id}"]`);
+      const val = getVal(id);
+      let ok = val !== '';
+      if (ok && id === 'email') ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+      field.classList.toggle('has-error', !ok);
+      if (!ok) valid = false;
+    });
+    return valid;
+  }
+
+  allFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', updateProgress);
+    el.addEventListener('change', updateProgress);
+    el.addEventListener('input', () => {
+      const field = el.closest('.ob-field');
+      if (field) field.classList.remove('has-error');
+    });
+  });
+
+  nextBtn.addEventListener('click', (e) => {
+    // Steps 1–3: validate that step and move forward instead of submitting.
+    // Step 4 (Review): let the click through so the form really submits to Flask.
+    if (currentStep < totalSteps) {
+      e.preventDefault();
+      if (!validateStep(currentStep)) return;
+      currentStep += 1;
+      showStep(currentStep);
+      return;
+    }
+    nextBtn.disabled = true;
+    nextBtn.textContent = 'Saving…';
+    // form submits normally here — Flask handles the redirect or re-renders with a flash on error
+  });
+
+  backBtn.addEventListener('click', () => {
+    if (currentStep === 1) return;
+    currentStep -= 1;
+    showStep(currentStep);
+  });
+
+  // ---- logo upload ----
+  const logoInput = document.getElementById('obLogoInput');
+  const logoPreview = document.getElementById('obLogoPreview');
+  const logoIcon = document.getElementById('obLogoIcon');
+  const logoRemove = document.getElementById('obLogoRemove');
+
+  logoInput.addEventListener('change', () => {
+    const file = logoInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      logoPreview.src = e.target.result;
+      logoPreview.style.display = 'block';
+      logoIcon.style.display = 'none';
+      logoRemove.style.display = 'inline-block';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  logoRemove.addEventListener('click', (e) => {
+    e.preventDefault();
+    logoInput.value = '';
+    logoPreview.src = '';
+    logoPreview.style.display = 'none';
+    logoIcon.style.display = 'block';
+    logoRemove.style.display = 'none';
+  });
+
+  // init
+  showStep(1);
+  updateProgress();
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block main %}
+<div class="oh-wrap">
+  <div class="oh-header">
+    <div>
+      <p class="greeting-eyebrow">Error {{ code }}</p>
+      <h1>{{ title }}</h1>
+    </div>
+  </div>
+
+  <div class="oh-table-card" style="text-align:center; padding: 60px 24px;">
+    <p style="color:#9A9AA0; font-size:15px; margin-bottom: 24px;">{{ message }}</p>
+    <a href="/" class="btn-primary-dark" style="display:inline-flex; text-decoration:none;">Back to Home</a>
+  </div>
+</div>
+{% endblock %}

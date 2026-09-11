@@ -1,0 +1,1852 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Recipes
+{% endblock %}
+
+{% block styles %}
+  <!-- Use nnorder.css for modal + table styling (same as products.html) -->
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Table styles (matching products.html / suppliers_customers.html) --- */
+
+    .recipe-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .recipe-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .recipe-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .recipe-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .recipe-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .recipe-table-wrapper tbody td:last-child {
+      text-align: right;
+    }
+    .recipe-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .recipe-table-wrapper tbody tr.recipe-row {
+      cursor: pointer;
+    }
+    .recipe-table-wrapper tbody tr.recipe-row:hover {
+      background: #f5f5f5;
+    }
+    .recipe-table-wrapper .no-recipes-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .remove-btn {
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .remove-btn:hover {
+      background: #c82333;
+    }
+    .remove-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* --- Top bar (copied from products.html) --- */
+    .inv-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .inv-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .btn-add-new {
+      padding: 12px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+
+    .inv-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .inv-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .inv-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .inv-sort-wrap select:focus {
+      border-color: #111;
+    }
+
+    .inv-search-wrap {
+      position: relative;
+      flex: 0 1 320px;
+    }
+    .inv-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .inv-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .inv-search-wrap .inv-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* Override nnorder.css button primary color to black */
+    .btn-primary {
+      background: #111 !important;
+      color: #fff !important;
+      border: none !important;
+    }
+    .btn-primary:hover {
+      background: #333 !important;
+    }
+
+    /* =======================================================
+       Page shell — matches the redesigned header/card pattern
+       used on the Home, Stock, Order History, and Products
+       pages, built on top of layout.html's design system.
+       ======================================================= */
+    .rcp-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .rcp-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .rcp-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .rcp-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing New Recipe + Execute Recipe + sort + search */
+    .rcp-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .rcp-toolbar-card .inv-topbar {
+      margin-bottom: 0;
+    }
+    .rcp-toolbar-card .inv-topbar h2 {
+      display: none; /* replaced by .rcp-header h1 above */
+    }
+    .rcp-toolbar-card .inv-topbar-actions {
+      margin-left: 0;
+      width: 100%;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      row-gap: 12px;
+    }
+
+    .rcp-toolbar-card .inv-topbar-actions .left-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .rcp-toolbar-card .btn-add-new {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .rcp-toolbar-card .btn-add-new svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+    .rcp-toolbar-card #openFormBtn {
+      background: #1c1c1c !important;
+      color: #fff !important;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+    }
+    .rcp-toolbar-card #openFormBtn:hover {
+      background: #303030 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .rcp-toolbar-card #executeRecipeBtn {
+      background: #F1F1F3 !important;
+      color: #1c1c1c !important;
+    }
+    .rcp-toolbar-card #executeRecipeBtn:hover {
+      background: #E7E7EA !important;
+      transform: translateY(-1px);
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .rcp-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .rcp-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .rcp-toolbar-card .inv-topbar-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .rcp-toolbar-card .inv-topbar-actions .left-buttons {
+        flex-direction: column;
+        align-items: stretch;
+        width: 100%;
+      }
+      .rcp-toolbar-card .btn-add-new {
+        width: 100%;
+        justify-content: center;
+      }
+      .rcp-toolbar-card .inv-search-wrap input {
+        width: 100%;
+      }
+      .rcp-toolbar-card,
+      .rcp-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+
+    /* --- Recipe modal is wider than the standard 340px modal --- */
+    #newRecipeModal .modal-box,
+    #editRecipeModal .modal-box {
+      width: 560px;
+      max-width: 92vw;
+      max-height: 86vh;
+      overflow-y: auto;
+    }
+
+    .recipe-name-row {
+      margin-bottom: 6px;
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #444;
+      margin: 18px 0 8px;
+    }
+    .section-label.first {
+      margin-top: 6px;
+    }
+
+    .product-row-header,
+    .product-row {
+      display: grid;
+      grid-template-columns: 1.6fr 0.7fr 0.6fr 28px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .product-row-header {
+      font-size: 11px;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .product-row select,
+    .product-row input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+    }
+
+    /* --- Searchable product dropdown (used for ingredient / output rows) --- */
+    .product-select {
+      position: relative;
+      width: 100%;
+    }
+    .product-select-toggle {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      color: #1c1c1c;
+    }
+    .product-select-toggle.placeholder {
+      color: #999;
+    }
+    .product-select-toggle::after {
+      content: '';
+      flex: 0 0 auto;
+      width: 8px;
+      height: 8px;
+      border-right: 1.5px solid #999;
+      border-bottom: 1.5px solid #999;
+      transform: rotate(45deg);
+      margin-top: -3px;
+    }
+    .product-select-toggle span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .product-select.open .product-select-toggle {
+      border-color: #111;
+    }
+    .product-select-panel {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+      z-index: 40;
+      overflow: hidden;
+    }
+    .product-select.open .product-select-panel {
+      display: block;
+    }
+    .product-select-search {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: none;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+      outline: none;
+    }
+    .product-select-options {
+      max-height: 190px;
+      overflow-y: auto;
+    }
+    .product-select-option {
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .product-select-option:hover,
+    .product-select-option.highlighted {
+      background: #f2f2f4;
+    }
+    .product-select-option.active {
+      font-weight: 600;
+      background: #eef2ff;
+    }
+    .product-select-empty {
+      padding: 10px;
+      font-size: 13px;
+      color: #999;
+      font-style: italic;
+    }
+    .product-row-remove-btn {
+      background: none;
+      border: none;
+      color: #d33;
+      font-size: 18px;
+      line-height: 1;
+      cursor: pointer;
+      text-align: center;
+      padding: 0;
+    }
+    .product-row-remove-btn:hover {
+      color: #a00;
+    }
+
+    .add-row-btn {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      margin-bottom: 4px;
+    }
+    .add-row-btn:hover {
+      background: #f0f0f0;
+    }
+
+    .form-error {
+      color: #d33;
+      font-size: 12px;
+      margin-top: -8px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .form-error.show {
+      display: block;
+    }
+
+    .chip-list {
+      color: #666;
+    }
+
+    /* --- Execute Recipe modal --- */
+    #executeRecipeModal .modal-box {
+      width: 640px;
+      max-width: 92vw;
+      max-height: 86vh;
+      overflow-y: auto;
+    }
+
+    .exec-table-wrap {
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 8px;
+    }
+    .exec-recipe-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .exec-recipe-table thead th {
+      position: sticky;
+      top: 0;
+      background: #111;
+      color: #fff;
+      text-align: left;
+      padding: 10px 14px;
+      font-weight: 600;
+    }
+    .exec-recipe-table tbody td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+      vertical-align: middle;
+    }
+    .exec-recipe-table tbody tr {
+      cursor: pointer;
+    }
+    .exec-recipe-table tbody tr:hover {
+      background: #f7f7f7;
+    }
+    .exec-recipe-table tbody tr.selected {
+      background: #eef2ff;
+    }
+    .exec-recipe-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    #execRunsGroup label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #444;
+    }
+    #execRunsGroup input {
+      width: 140px;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    /* --- Insufficient Stock modal --- */
+    #insufficientStockModal .modal-box {
+      width: 480px;
+      max-width: 92vw;
+    }
+    .exec-shortage-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .exec-shortage-table thead th {
+      text-align: left;
+      padding: 8px 10px;
+      background: #f2f2f2;
+      color: #444;
+      font-weight: 600;
+    }
+    .exec-shortage-table tbody td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+    }
+
+    /* --- Traceability toggle (reused switch styling) --- */
+    .use-recipe-switch-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 16px 0 4px;
+    }
+    .use-recipe-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .use-recipe-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .use-recipe-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #ccc;
+      transition: background-color 0.15s ease;
+      border-radius: 24px;
+    }
+    .use-recipe-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #fff;
+      transition: transform 0.15s ease;
+      border-radius: 50%;
+    }
+    .use-recipe-switch input:checked + .use-recipe-slider {
+      background-color: #0b1215;
+    }
+    .use-recipe-switch input:checked + .use-recipe-slider:before {
+      transform: translateX(20px);
+    }
+    .use-recipe-label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .use-recipe-hint {
+      color: #888;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 4px 0 0;
+    }
+
+    /* --- Traceability batch-selection modal --- */
+    #traceabilityModal .modal-box {
+      width: 680px;
+      max-width: 92vw;
+      max-height: 86vh;
+      overflow-y: auto;
+    }
+    .trace-ingredient-block { margin-bottom: 18px; }
+    .trace-ingredient-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .trace-ingredient-progress {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #eee;
+      color: #666;
+    }
+    .trace-ingredient-progress.trace-progress-ok { background: #e6f7ec; color: #1a7f3c; }
+    .trace-ingredient-progress.trace-progress-short { background: #fdecea; color: #c0392b; }
+    .trace-batch-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .trace-batch-table thead th {
+      text-align: left;
+      padding: 6px 8px;
+      background: #f5f5f5;
+      color: #444;
+      font-weight: 600;
+    }
+    .trace-batch-table tbody td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .trace-batch-table .trace-batch-qty {
+      width: 70px;
+      padding: 4px 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+{% set products = products | default([]) %}
+{% set recipes = recipes | default([]) %}
+
+<div class="rcp-wrap">
+
+  <div class="rcp-header">
+    <div>
+      <p class="greeting-eyebrow">Manufacturing</p>
+      <h1>Recipes</h1>
+    </div>
+  </div>
+
+  <div class="rcp-toolbar-card">
+    <div class="inv-topbar">
+      <h2>Recipes</h2>
+      <div class="inv-topbar-actions">
+        <div class="left-buttons">
+          <button class="btn-primary btn-add-new" id="openFormBtn" type="button">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+            New Recipe
+          </button>
+          <button class="btn-primary btn-add-new" id="executeRecipeBtn" type="button">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l10 6-10 6V4z"/></svg>
+            Execute Recipe
+          </button>
+        </div>
+        <div class="inv-sort-wrap">
+          <label for="inv-sort-select">Sort By</label>
+          <select id="inv-sort-select">
+            <option value="name_asc" selected>Recipe Name (A–Z)</option>
+            <option value="name_desc">Recipe Name (Z–A)</option>
+            <option value="price_desc">Selling Price (High to Low)</option>
+            <option value="price_asc">Selling Price (Low to High)</option>
+            <option value="cost_desc">Cost (High to Low)</option>
+            <option value="cost_asc">Cost (Low to High)</option>
+            <option value="profit_desc">Profit (High to Low)</option>
+            <option value="profit_asc">Profit (Low to High)</option>
+          </select>
+        </div>
+        <div class="inv-search-wrap">
+          <span class="inv-search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+            </svg>
+          </span>
+          <input type="text" id="inv-search-input" placeholder="Search recipes...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Recipe Modal -->
+  <div class="modal-overlay" id="newRecipeModal">
+    <div class="modal-box">
+      <h3>New Recipe</h3>
+      <form id="recipeForm" action="/add_recipe" method="POST">
+
+        <div class="recipe-name-row form-group">
+          <label for="recipeName">Recipe name</label>
+          <input type="text" id="recipeName" name="name" placeholder="e.g. Orange Oil Blend" required>
+        </div>
+
+        <div class="section-label first">Outputs</div>
+
+        <div class="product-row-header">
+          <div>Product</div>
+          <div>Amount</div>
+          <div>UoM</div>
+          <div></div>
+        </div>
+
+        <div id="outputRows">
+          <!-- Output rows are injected here by JS -->
+        </div>
+
+        <button class="add-row-btn" type="button" id="addOutputBtn">+ Add output</button>
+
+        <div class="section-label">Ingredients</div>
+
+        <div class="product-row-header">
+          <div>Product</div>
+          <div>Amount</div>
+          <div>UoM</div>
+          <div></div>
+        </div>
+
+        <div id="ingredientRows">
+          <!-- Ingredient rows are injected here by JS -->
+        </div>
+
+        <button class="add-row-btn" type="button" id="addIngredientBtn">+ Add ingredient</button>
+        <div class="form-error" id="recipeFormError">Please add a recipe name, at least one output product, and at least one valid ingredient.</div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelNewRecipeBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveNewRecipeBtn" type="submit">Save recipe</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Recipe Modal -->
+  <div class="modal-overlay" id="editRecipeModal">
+    <div class="modal-box">
+      <h3>Edit Recipe</h3>
+      <form id="editRecipeForm">
+        <input type="hidden" id="editRecipeId">
+
+        <div class="recipe-name-row form-group">
+          <label for="editRecipeName">Recipe name</label>
+          <input type="text" id="editRecipeName" required>
+        </div>
+
+        <div class="section-label first">Outputs</div>
+
+        <div class="product-row-header">
+          <div>Product</div>
+          <div>Amount</div>
+          <div>UoM</div>
+          <div></div>
+        </div>
+
+        <div id="editOutputRows">
+          <!-- Output rows are injected here by JS -->
+        </div>
+
+        <button class="add-row-btn" type="button" id="editAddOutputBtn">+ Add output</button>
+
+        <div class="section-label">Ingredients</div>
+
+        <div class="product-row-header">
+          <div>Product</div>
+          <div>Amount</div>
+          <div>UoM</div>
+          <div></div>
+        </div>
+
+        <div id="editIngredientRows">
+          <!-- Ingredient rows are injected here by JS -->
+        </div>
+
+        <button class="add-row-btn" type="button" id="editAddIngredientBtn">+ Add ingredient</button>
+        <div class="form-error" id="editRecipeFormError">Please add a recipe name, at least one output product, and at least one valid ingredient.</div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelEditRecipeBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveEditRecipeBtn" type="button">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Execute Recipe Modal -->
+  <div class="modal-overlay" id="executeRecipeModal">
+    <div class="modal-box">
+      <h3>Execute Recipe</h3>
+
+      <div class="exec-table-wrap">
+        <table class="exec-recipe-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Recipe name</th>
+              <th>Output product(s)</th>
+              <th>Ingredients</th>
+            </tr>
+          </thead>
+          <tbody id="execRecipeTableBody">
+            <!-- Rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="form-group" id="execRunsGroup" style="margin-top:16px; display:none;">
+        <label for="execRuns">Number of Runs</label>
+        <input type="number" id="execRuns" min="1" step="1" value="1">
+      </div>
+
+      <div class="form-error" id="execFormError">Please select a recipe and enter a valid number of runs.</div>
+
+      <div class="use-recipe-switch-row">
+        <label class="use-recipe-switch">
+          <input type="checkbox" id="traceabilityToggle">
+          <span class="use-recipe-slider"></span>
+        </label>
+        <span class="use-recipe-label">Traceability</span>
+      </div>
+      <p class="use-recipe-hint">
+        <strong>Off</strong> — ingredients are auto-consumed (oldest stock first).<br>
+        <strong>On</strong> — you'll choose exactly which stock batches (location, lot, dates) to use.
+      </p>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="cancelExecuteBtn" type="button">Cancel</button>
+        <button class="btn-primary" id="runExecuteBtn" type="button">Execute</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Insufficient Stock Modal -->
+  <div class="modal-overlay" id="insufficientStockModal">
+    <div class="modal-box">
+      <h3>Not Enough Stock</h3>
+      <p style="font-size:13px; color:#444; margin-bottom:12px;">
+        This recipe needs more of the following items than you currently have in stock:
+      </p>
+      <table class="exec-shortage-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Needed</th>
+            <th>Available</th>
+          </tr>
+        </thead>
+        <tbody id="shortageTableBody">
+          <!-- Rows injected by JS -->
+        </tbody>
+      </table>
+      <div class="modal-actions" style="margin-top:18px;">
+        <button class="btn-secondary" id="cancelExecutionBtn" type="button">Cancel execution</button>
+        <button class="btn-primary" id="continueAnywayBtn" type="button">Continue Anyway</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Traceability Selection Modal -->
+  <div class="modal-overlay" id="traceabilityModal">
+    <div class="modal-box">
+      <h3>Select Ingredient Batches</h3>
+      <p class="use-recipe-hint">Choose which stock batches to use for each ingredient. Selected quantity must cover what the recipe needs.</p>
+      <div id="traceabilityIngredientsWrap"></div>
+      <div class="form-error" id="traceabilityFormError">Please select enough stock to cover the required quantity for every ingredient.</div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="cancelTraceabilityBtn" type="button">Cancel</button>
+        <button class="btn-primary" id="confirmTraceabilityBtn" type="button">Confirm &amp; Execute</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="rcp-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Recipes</h2>
+      <span class="section-sub">{{ recipes|length if recipes else 0 }} total</span>
+    </div>
+    <div class="recipe-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Recipe name</th>
+          <th>Output product(s)</th>
+          <th>Ingredients</th>
+          <th>Selling Price</th>
+          <th>Cost</th>
+          <th>Profit</th>
+          <th></th> <!-- Remove column -->
+        </tr>
+      </thead>
+      <tbody id="recipesTableBody">
+        {% if recipes %}
+          {% for recipe in recipes %}
+            <tr class="recipe-row"
+                data-recipe-id="{{ recipe['id'] }}"
+                data-outputs='{{ recipe["outputs"] | tojson }}'
+                data-ingredients='{{ recipe["ingredients"] | tojson }}'
+                data-name="{{ recipe['name'] }}"
+                data-price="{{ recipe.total_price }}"
+                data-cost="{{ recipe.total_cost }}"
+                data-profit="{{ recipe.profit }}">
+              <td class="recipe-name">{{ recipe["name"] }}</td>
+              <td class="recipe-outputs chip-list">{{ recipe["outputs"] | length }} product{{ "s" if recipe["outputs"] | length != 1 else "" }}</td>
+              <td class="chip-list">{{ recipe["ingredients"] | length }} item{{ "s" if recipe["ingredients"] | length != 1 else "" }}</td>
+              <td class="recipe-price">{{ "%.2f"|format(recipe.total_price|float) }}</td>
+              <td class="recipe-cost">{{ "%.2f"|format(recipe.total_cost|float) }}</td>
+              <td class="recipe-profit">{{ "%.2f"|format(recipe.profit|float) }}</td>
+              <td>
+                <button type="button" class="remove-btn" data-recipe-id="{{ recipe['id'] }}">Remove</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-recipes-row" id="no-recipes-row">
+            <td colspan="7">No recipes available.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script>
+  // ---- Products available for ingredient / output selection ----
+  const PRODUCTS = {{ products | tojson }};
+
+  // ---- Recipes available for execution ----
+  const RECIPES = {{ recipes | tojson }};
+
+  function productName(pid) {
+    const p = PRODUCTS.find(p => String(p.id) === String(pid));
+    return p ? p.name : `#${pid}`;
+  }
+
+  // ---- Close every open product dropdown (used on outside click / escape / row removal) ----
+  function closeAllProductSelects(except) {
+    document.querySelectorAll('.product-select.open').forEach(w => {
+      if (w !== except) w.classList.remove('open');
+    });
+  }
+  document.addEventListener('click', () => closeAllProductSelects());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllProductSelects();
+  });
+
+  // ---- Build a searchable product dropdown: a hidden .row-product input (the actual
+  // value used by collectProductRows) plus a text toggle + search box + filtered list ----
+  function buildProductSelect(selectedId) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'product-select';
+
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.className = 'row-product';
+    hiddenInput.value = selectedId || '';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'product-select-toggle';
+
+    const toggleLabel = document.createElement('span');
+    toggleBtn.appendChild(toggleLabel);
+
+    function setToggleLabel(id) {
+      const p = id ? PRODUCTS.find(p => String(p.id) === String(id)) : null;
+      toggleLabel.textContent = p ? p.name : 'Select product';
+      toggleBtn.classList.toggle('placeholder', !p);
+    }
+    setToggleLabel(selectedId);
+
+    const panel = document.createElement('div');
+    panel.className = 'product-select-panel';
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'product-select-search';
+    searchInput.placeholder = 'Search products…';
+
+    const optionsList = document.createElement('div');
+    optionsList.className = 'product-select-options';
+
+    function renderOptions(filter) {
+      optionsList.innerHTML = '';
+      const q = (filter || '').trim().toLowerCase();
+      const matches = PRODUCTS.filter(p => !q || p.name.toLowerCase().includes(q));
+
+      if (matches.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'product-select-empty';
+        empty.textContent = 'No products found';
+        optionsList.appendChild(empty);
+        return;
+      }
+
+      matches.forEach(p => {
+        const opt = document.createElement('div');
+        opt.className = 'product-select-option';
+        if (String(hiddenInput.value) === String(p.id)) opt.classList.add('active');
+        opt.textContent = p.name;
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          hiddenInput.value = p.id;
+          hiddenInput.dataset.uom = p.uom || '';
+          setToggleLabel(p.id);
+          wrapper.classList.remove('open');
+          hiddenInput.dispatchEvent(new Event('change'));
+        });
+        optionsList.appendChild(opt);
+      });
+    }
+
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = wrapper.classList.contains('open');
+      closeAllProductSelects(wrapper);
+      if (!isOpen) {
+        wrapper.classList.add('open');
+        searchInput.value = '';
+        renderOptions('');
+        // Focus after the dropdown is visible so the caret lands in the search box
+        setTimeout(() => searchInput.focus(), 0);
+      } else {
+        wrapper.classList.remove('open');
+      }
+    });
+
+    searchInput.addEventListener('click', (e) => e.stopPropagation());
+    searchInput.addEventListener('input', () => renderOptions(searchInput.value));
+
+    panel.appendChild(searchInput);
+    panel.appendChild(optionsList);
+    wrapper.appendChild(hiddenInput);
+    wrapper.appendChild(toggleBtn);
+    wrapper.appendChild(panel);
+
+    return wrapper;
+  }
+
+  // ---- Build a single product row (used for both outputs and ingredients) ----
+  function buildProductRow(container, item) {
+    const row = document.createElement('div');
+    row.className = 'product-row';
+
+    const productSelect = buildProductSelect(item ? item.product_id : null);
+    const hiddenInput = productSelect.querySelector('.row-product');
+
+    const amountInput = document.createElement('input');
+    amountInput.type = 'number';
+    amountInput.min = '0';
+    amountInput.step = '0.01';
+    amountInput.className = 'row-amount';
+    amountInput.placeholder = 'Amount';
+    if (item) amountInput.value = item.amount;
+
+    const uomInput = document.createElement('input');
+    uomInput.type = 'text';
+    uomInput.className = 'row-uom';
+    uomInput.placeholder = 'UoM';
+    if (item) uomInput.value = item.uom || '';
+
+    // Auto-fill UoM from the selected product's default unit
+    hiddenInput.addEventListener('change', () => {
+      if (hiddenInput.dataset.uom && !uomInput.value) {
+        uomInput.value = hiddenInput.dataset.uom;
+      }
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'product-row-remove-btn';
+    removeBtn.innerHTML = '&times;';
+    removeBtn.addEventListener('click', () => {
+      row.remove();
+    });
+
+    row.appendChild(productSelect);
+    row.appendChild(amountInput);
+    row.appendChild(uomInput);
+    row.appendChild(removeBtn);
+    container.appendChild(row);
+  }
+
+  function collectProductRows(container) {
+    const rows = container.querySelectorAll('.product-row');
+    const items = [];
+    rows.forEach(row => {
+      const productId = row.querySelector('.row-product').value;
+      const amount = parseFloat(row.querySelector('.row-amount').value);
+      const uom = row.querySelector('.row-uom').value.trim();
+      if (productId && !isNaN(amount) && amount > 0) {
+        items.push({ product_id: productId, amount, uom });
+      }
+    });
+    return items;
+  }
+
+  // ================= New Recipe Modal =================
+  const newModal = document.getElementById('newRecipeModal');
+  const openNewBtn = document.getElementById('openFormBtn');
+  const cancelNewBtn = document.getElementById('cancelNewRecipeBtn');
+  const recipeForm = document.getElementById('recipeForm');
+  const outputRowsEl = document.getElementById('outputRows');
+  const addOutputBtn = document.getElementById('addOutputBtn');
+  const ingredientRowsEl = document.getElementById('ingredientRows');
+  const addIngredientBtn = document.getElementById('addIngredientBtn');
+  const recipeFormError = document.getElementById('recipeFormError');
+
+  function resetNewRecipeForm() {
+    recipeForm.reset();
+    outputRowsEl.innerHTML = '';
+    buildProductRow(outputRowsEl, null);
+    ingredientRowsEl.innerHTML = '';
+    buildProductRow(ingredientRowsEl, null);
+    recipeFormError.classList.remove('show');
+  }
+
+  openNewBtn.addEventListener('click', () => {
+    resetNewRecipeForm();
+    newModal.classList.add('open');
+    document.getElementById('recipeName').focus();
+  });
+
+  addOutputBtn.addEventListener('click', () => {
+    buildProductRow(outputRowsEl, null);
+  });
+
+  addIngredientBtn.addEventListener('click', () => {
+    buildProductRow(ingredientRowsEl, null);
+  });
+
+  cancelNewBtn.addEventListener('click', () => {
+    newModal.classList.remove('open');
+  });
+
+  newModal.addEventListener('click', (e) => {
+    if (e.target === newModal) newModal.classList.remove('open');
+  });
+
+  recipeForm.addEventListener('submit', (e) => {
+    const name = document.getElementById('recipeName').value.trim();
+    const outputs = collectProductRows(outputRowsEl);
+    const ingredients = collectProductRows(ingredientRowsEl);
+
+    if (!name || outputs.length === 0 || ingredients.length === 0) {
+      e.preventDefault();
+      recipeFormError.classList.add('show');
+      return;
+    }
+    recipeFormError.classList.remove('show');
+
+    // Attach outputs + ingredients as hidden JSON fields before submitting
+    let hiddenOutputs = recipeForm.querySelector('input[name="outputs"]');
+    if (!hiddenOutputs) {
+      hiddenOutputs = document.createElement('input');
+      hiddenOutputs.type = 'hidden';
+      hiddenOutputs.name = 'outputs';
+      recipeForm.appendChild(hiddenOutputs);
+    }
+    hiddenOutputs.value = JSON.stringify(outputs);
+
+    let hiddenIngredients = recipeForm.querySelector('input[name="ingredients"]');
+    if (!hiddenIngredients) {
+      hiddenIngredients = document.createElement('input');
+      hiddenIngredients.type = 'hidden';
+      hiddenIngredients.name = 'ingredients';
+      recipeForm.appendChild(hiddenIngredients);
+    }
+    hiddenIngredients.value = JSON.stringify(ingredients);
+  });
+
+  // ================= Edit Recipe Modal =================
+  const editModal = document.getElementById('editRecipeModal');
+  const cancelEditBtn = document.getElementById('cancelEditRecipeBtn');
+  const saveEditBtn = document.getElementById('saveEditRecipeBtn');
+  const editId = document.getElementById('editRecipeId');
+  const editName = document.getElementById('editRecipeName');
+  const editOutputRowsEl = document.getElementById('editOutputRows');
+  const editAddOutputBtn = document.getElementById('editAddOutputBtn');
+  const editIngredientRowsEl = document.getElementById('editIngredientRows');
+  const editAddIngredientBtn = document.getElementById('editAddIngredientBtn');
+  const editRecipeFormError = document.getElementById('editRecipeFormError');
+
+  let currentEditRow = null;
+
+  editAddOutputBtn.addEventListener('click', () => {
+    buildProductRow(editOutputRowsEl, null);
+  });
+
+  editAddIngredientBtn.addEventListener('click', () => {
+    buildProductRow(editIngredientRowsEl, null);
+  });
+
+  function openEditModal(row) {
+    const recipeId = row.dataset.recipeId;
+    const name = row.querySelector('.recipe-name').textContent.trim();
+
+    let outputs = [];
+    try {
+      outputs = JSON.parse(row.dataset.outputs || '[]');
+    } catch (err) {
+      outputs = [];
+    }
+
+    let ingredients = [];
+    try {
+      ingredients = JSON.parse(row.dataset.ingredients || '[]');
+    } catch (err) {
+      ingredients = [];
+    }
+
+    editId.value = recipeId;
+    editName.value = name;
+
+    editOutputRowsEl.innerHTML = '';
+    if (outputs.length === 0) {
+      buildProductRow(editOutputRowsEl, null);
+    } else {
+      outputs.forEach(o => buildProductRow(editOutputRowsEl, o));
+    }
+
+    editIngredientRowsEl.innerHTML = '';
+    if (ingredients.length === 0) {
+      buildProductRow(editIngredientRowsEl, null);
+    } else {
+      ingredients.forEach(ing => buildProductRow(editIngredientRowsEl, ing));
+    }
+
+    editRecipeFormError.classList.remove('show');
+    currentEditRow = row;
+    editModal.classList.add('open');
+    editName.focus();
+  }
+
+  function closeEditModal() {
+    editModal.classList.remove('open');
+    currentEditRow = null;
+  }
+
+  cancelEditBtn.addEventListener('click', closeEditModal);
+  editModal.addEventListener('click', (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
+
+  saveEditBtn.addEventListener('click', async () => {
+    const recipeId = editId.value;
+    const name = editName.value.trim();
+    const outputs = collectProductRows(editOutputRowsEl);
+    const ingredients = collectProductRows(editIngredientRowsEl);
+
+    if (!name || outputs.length === 0 || ingredients.length === 0) {
+      editRecipeFormError.classList.add('show');
+      return;
+    }
+    editRecipeFormError.classList.remove('show');
+
+    saveEditBtn.disabled = true;
+    saveEditBtn.textContent = 'Saving…';
+
+    try {
+      const response = await fetch('/edit_recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipe_id: recipeId,
+          name,
+          outputs,
+          ingredients
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.message || 'Failed to update recipe.');
+        return;
+      }
+
+      if (currentEditRow) {
+        // Update recipe name
+        currentEditRow.querySelector('.recipe-name').textContent = name;
+        // Update output count
+        const outputCell = currentEditRow.querySelector('.recipe-outputs');
+        outputCell.textContent = outputs.length + (outputs.length === 1 ? ' product' : ' products');
+        // Update ingredient count (second .chip-list)
+        const ingredientCells = currentEditRow.querySelectorAll('.chip-list');
+        if (ingredientCells.length >= 2) {
+          ingredientCells[1].textContent = ingredients.length + (ingredients.length === 1 ? ' item' : ' items');
+        }
+        // Update price, cost, profit from the response
+        if (data.recipe) {
+          const priceCell = currentEditRow.querySelector('.recipe-price');
+          const costCell = currentEditRow.querySelector('.recipe-cost');
+          const profitCell = currentEditRow.querySelector('.recipe-profit');
+          if (priceCell) priceCell.textContent = (data.recipe.total_price || 0).toFixed(2);
+          if (costCell) costCell.textContent = (data.recipe.total_cost || 0).toFixed(2);
+          if (profitCell) profitCell.textContent = (data.recipe.profit || 0).toFixed(2);
+        }
+        // Update data attributes
+        currentEditRow.dataset.outputs = JSON.stringify(outputs);
+        currentEditRow.dataset.ingredients = JSON.stringify(ingredients);
+      }
+
+      closeEditModal();
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while saving.');
+    } finally {
+      saveEditBtn.disabled = false;
+      saveEditBtn.textContent = 'Save';
+    }
+  });
+
+  // ---- Table row click: open edit modal (unless Remove button clicked) ----
+  const recipesTableBody = document.getElementById('recipesTableBody');
+
+  recipesTableBody.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+      e.stopPropagation();
+      deleteRecipe(removeBtn);
+      return;
+    }
+
+    const row = e.target.closest('.recipe-row');
+    if (row) {
+      openEditModal(row);
+    }
+  });
+
+  // ---- Delete recipe ----
+  function deleteRecipe(removeBtn) {
+    const recipeId = removeBtn.dataset.recipeId;
+
+    if (!confirm('Remove this recipe? This cannot be undone.')) return;
+
+    removeBtn.disabled = true;
+
+    fetch('/delete_recipe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipe_id: recipeId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to delete recipe');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          const row = recipesTableBody.querySelector(`tr[data-recipe-id="${recipeId}"]`);
+          if (row) row.remove();
+          toggleNoRecipesRow();
+        } else {
+          alert('Error: ' + (data.message || 'Could not delete recipe.'));
+          removeBtn.disabled = false;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while removing the recipe.');
+        removeBtn.disabled = false;
+      });
+  }
+
+  // ---- Toggle "no recipes" row ----
+  function toggleNoRecipesRow() {
+    const hasRows = recipesTableBody.querySelectorAll('tr.recipe-row').length > 0;
+    let noRow = document.getElementById('no-recipes-row');
+
+    if (!hasRows && !noRow) {
+      noRow = document.createElement('tr');
+      noRow.className = 'no-recipes-row';
+      noRow.id = 'no-recipes-row';
+      noRow.innerHTML = '<td colspan="7">No recipes available.</td>';
+      recipesTableBody.appendChild(noRow);
+    } else if (hasRows && noRow) {
+      noRow.remove();
+    }
+  }
+
+  // ---- Search / filter ----
+  const searchInput = document.getElementById('inv-search-input');
+
+  function toggleNoSearchResultsRow(show) {
+    let row = document.getElementById('no-search-results-row');
+    if (show && !row) {
+      row = document.createElement('tr');
+      row.className = 'no-recipes-row';
+      row.id = 'no-search-results-row';
+      row.innerHTML = '<td colspan="7">No matching recipes found</td>';
+      recipesTableBody.appendChild(row);
+    } else if (!show && row) {
+      row.remove();
+    }
+  }
+
+  function filterRecipes() {
+    const term = searchInput.value.trim().toLowerCase();
+    const rows = recipesTableBody.querySelectorAll('tr.recipe-row');
+
+    if (rows.length === 0) {
+      toggleNoSearchResultsRow(false);
+      return;
+    }
+
+    let anyVisible = false;
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    toggleNoSearchResultsRow(!anyVisible);
+  }
+
+  searchInput.addEventListener('input', filterRecipes);
+
+  // ---- Sort dropdown (defaults to Recipe Name A–Z) ----
+  const invSortSelect = document.getElementById('inv-sort-select');
+
+  function sortRecipeRows() {
+    const sortValue = invSortSelect.value || 'name_asc';
+    const rows = Array.from(recipesTableBody.querySelectorAll('tr.recipe-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'price_asc' || sortValue === 'price_desc') {
+        const priceA = parseFloat(a.dataset.price) || 0;
+        const priceB = parseFloat(b.dataset.price) || 0;
+        return sortValue === 'price_asc' ? priceA - priceB : priceB - priceA;
+      } else if (sortValue === 'cost_asc' || sortValue === 'cost_desc') {
+        const costA = parseFloat(a.dataset.cost) || 0;
+        const costB = parseFloat(b.dataset.cost) || 0;
+        return sortValue === 'cost_asc' ? costA - costB : costB - costA;
+      } else if (sortValue === 'profit_asc' || sortValue === 'profit_desc') {
+        const profitA = parseFloat(a.dataset.profit) || 0;
+        const profitB = parseFloat(b.dataset.profit) || 0;
+        return sortValue === 'profit_asc' ? profitA - profitB : profitB - profitA;
+      } else {
+        const nameA = (a.dataset.name || '').toLowerCase();
+        const nameB = (b.dataset.name || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortValue === 'name_asc' ? cmp : -cmp;
+      }
+    });
+
+    rows.forEach(row => recipesTableBody.appendChild(row));
+  }
+
+  invSortSelect.addEventListener('change', sortRecipeRows);
+
+  // Apply the default sort (Recipe Name A–Z) as soon as the page loads
+  sortRecipeRows();
+
+  // ================= Execute Recipe Modal =================
+  const executeModal = document.getElementById('executeRecipeModal');
+  const executeBtn = document.getElementById('executeRecipeBtn');
+  const cancelExecuteBtn = document.getElementById('cancelExecuteBtn');
+  const execRecipeTableBody = document.getElementById('execRecipeTableBody');
+  const execRunsGroup = document.getElementById('execRunsGroup');
+  const execRunsInput = document.getElementById('execRuns');
+  const execFormError = document.getElementById('execFormError');
+  const runExecuteBtn = document.getElementById('runExecuteBtn');
+  const traceabilityToggle = document.getElementById('traceabilityToggle');
+
+  let selectedRecipeId = null;
+
+  function renderExecRecipeTable() {
+    execRecipeTableBody.innerHTML = '';
+
+    if (RECIPES.length === 0) {
+      execRecipeTableBody.innerHTML =
+        '<tr><td colspan="4" style="text-align:center;color:#999;font-style:italic;padding:20px;">No recipes available.</td></tr>';
+      return;
+    }
+
+    RECIPES.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.className = 'exec-recipe-row';
+      tr.dataset.recipeId = r.id;
+
+      const outputNames = (r.outputs || []).map(o => productName(o.product_id)).join(', ');
+      const ingredientNames = (r.ingredients || []).map(i => productName(i.product_id)).join(', ');
+
+      const radioTd = document.createElement('td');
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'execRecipeSelect';
+      radio.value = r.id;
+      radioTd.appendChild(radio);
+
+      const nameTd = document.createElement('td');
+      nameTd.textContent = r.name;
+
+      const outputsTd = document.createElement('td');
+      outputsTd.textContent = outputNames;
+
+      const ingredientsTd = document.createElement('td');
+      ingredientsTd.textContent = ingredientNames;
+
+      tr.appendChild(radioTd);
+      tr.appendChild(nameTd);
+      tr.appendChild(outputsTd);
+      tr.appendChild(ingredientsTd);
+
+      tr.addEventListener('click', () => selectExecRecipe(r.id));
+      execRecipeTableBody.appendChild(tr);
+    });
+  }
+
+  function selectExecRecipe(recipeId) {
+    selectedRecipeId = recipeId;
+    execRecipeTableBody.querySelectorAll('.exec-recipe-row').forEach(row => {
+      const isSelected = String(row.dataset.recipeId) === String(recipeId);
+      row.classList.toggle('selected', isSelected);
+      row.querySelector('input[type="radio"]').checked = isSelected;
+    });
+    execRunsGroup.style.display = 'block';
+    execFormError.classList.remove('show');
+  }
+
+  function resetExecuteModal() {
+    selectedRecipeId = null;
+    execRunsGroup.style.display = 'none';
+    execRunsInput.value = 1;
+    execFormError.classList.remove('show');
+    traceabilityToggle.checked = false;
+    renderExecRecipeTable();
+  }
+
+  executeBtn.addEventListener('click', () => {
+    resetExecuteModal();
+    executeModal.classList.add('open');
+  });
+
+  cancelExecuteBtn.addEventListener('click', () => {
+    executeModal.classList.remove('open');
+  });
+
+  executeModal.addEventListener('click', (e) => {
+    if (e.target === executeModal) executeModal.classList.remove('open');
+  });
+
+  runExecuteBtn.addEventListener('click', () => {
+    const runs = parseInt(execRunsInput.value, 10);
+    if (!selectedRecipeId || isNaN(runs) || runs <= 0) {
+      execFormError.classList.add('show');
+      return;
+    }
+    execFormError.classList.remove('show');
+
+    if (traceabilityToggle.checked) {
+      openTraceabilitySelection(selectedRecipeId, runs);
+      return;
+    }
+    runRecipeExecution(selectedRecipeId, runs, false);
+  });
+
+  // ================= Insufficient Stock Modal =================
+  const insufficientModal = document.getElementById('insufficientStockModal');
+  const shortageTableBody = document.getElementById('shortageTableBody');
+  const cancelExecutionBtn = document.getElementById('cancelExecutionBtn');
+  const continueAnywayBtn = document.getElementById('continueAnywayBtn');
+
+  let pendingExecution = null; // { recipeId, runs, selectedStock }
+
+  function showInsufficientStockModal(items, recipeId, runs, selectedStock) {
+    shortageTableBody.innerHTML = '';
+    items.forEach(item => {
+      const tr = document.createElement('tr');
+      const uomSuffix = item.uom ? ` ${item.uom}` : '';
+      tr.innerHTML = `
+        <td>${item.name}</td>
+        <td>${item.needed}${uomSuffix}</td>
+        <td>${item.available}${uomSuffix}</td>
+      `;
+      shortageTableBody.appendChild(tr);
+    });
+    pendingExecution = { recipeId, runs, selectedStock };
+    insufficientModal.classList.add('open');
+  }
+
+  function closeInsufficientModal() {
+    pendingExecution = null;
+    insufficientModal.classList.remove('open');
+  }
+
+  cancelExecutionBtn.addEventListener('click', closeInsufficientModal);
+  insufficientModal.addEventListener('click', (e) => {
+    if (e.target === insufficientModal) closeInsufficientModal();
+  });
+
+  continueAnywayBtn.addEventListener('click', () => {
+    if (!pendingExecution) return;
+    const { recipeId, runs, selectedStock } = pendingExecution;
+    insufficientModal.classList.remove('open');
+    pendingExecution = null;
+    runRecipeExecution(recipeId, runs, true, selectedStock);
+  });
+
+  // ================= Shared execution call =================
+  async function runRecipeExecution(recipeId, runs, force, selectedStock) {
+    runExecuteBtn.disabled = true;
+    runExecuteBtn.textContent = 'Running…';
+
+    const payload = { recipe_id: recipeId, runs, force };
+    if (selectedStock && selectedStock.length) payload.selected_stock = selectedStock;
+
+    try {
+      const response = await fetch('/execute_recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (data.insufficient) {
+        showInsufficientStockModal(data.items, recipeId, runs, selectedStock);
+        return;
+      }
+
+      if (!data.success) {
+        alert(data.message || 'Failed to execute recipe.');
+        return;
+      }
+
+      executeModal.classList.remove('open');
+      alert('Recipe executed successfully. Stock has been updated.');
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while executing the recipe.');
+    } finally {
+      runExecuteBtn.disabled = false;
+      runExecuteBtn.textContent = 'Execute';
+    }
+  }
+
+  // ================= Traceability =================
+  const traceabilityModal = document.getElementById('traceabilityModal');
+  const traceabilityIngredientsWrap = document.getElementById('traceabilityIngredientsWrap');
+  const traceabilityFormError = document.getElementById('traceabilityFormError');
+  const cancelTraceabilityBtn = document.getElementById('cancelTraceabilityBtn');
+  const confirmTraceabilityBtn = document.getElementById('confirmTraceabilityBtn');
+
+  let traceabilityContext = null; // { recipeId, runs, ingredients }
+
+  function ingredientSelectedTotal(pid) {
+    let total = 0;
+    traceabilityIngredientsWrap
+      .querySelectorAll(`.trace-batch-row[data-pid="${pid}"] .trace-batch-qty`)
+      .forEach(input => { total += parseFloat(input.value) || 0; });
+    return total;
+  }
+
+  function updateIngredientProgress(pid) {
+    const needed = traceabilityContext.ingredients.find(i => String(i.pid) === String(pid)).needed;
+    const total = ingredientSelectedTotal(pid);
+    const progressEl = traceabilityIngredientsWrap.querySelector(`.trace-ingredient-progress[data-pid="${pid}"]`);
+    if (progressEl) {
+      progressEl.textContent = `${total} / ${needed} selected`;
+      progressEl.classList.toggle('trace-progress-ok', total >= needed);
+      progressEl.classList.toggle('trace-progress-short', total < needed);
+    }
+  }
+
+  function renderTraceabilityModal(ingredients, recipeId, runs) {
+    traceabilityContext = { recipeId, runs, ingredients };
+    traceabilityIngredientsWrap.innerHTML = '';
+
+    ingredients.forEach(ing => {
+      const block = document.createElement('div');
+      block.className = 'trace-ingredient-block';
+      const uomSuffix = ing.uom ? ` ${ing.uom}` : '';
+
+      block.innerHTML = `
+        <div class="trace-ingredient-header">
+          <strong>${ing.name}</strong>
+          <span class="trace-ingredient-progress" data-pid="${ing.pid}">0 / ${ing.needed} selected</span>
+        </div>
+      `;
+
+      const table = document.createElement('table');
+      table.className = 'trace-batch-table';
+      table.innerHTML = `
+        <thead><tr><th></th><th>Location</th><th>Lot</th><th>Prod. Date</th><th>Exp. Date</th><th>Available</th><th>Use qty</th></tr></thead>
+        <tbody></tbody>
+      `;
+      const tbody = table.querySelector('tbody');
+
+      if (!ing.batches || ing.batches.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="color:#999;font-style:italic;">No stock batches available.</td></tr>`;
+      } else {
+        ing.batches.forEach(b => {
+          const tr = document.createElement('tr');
+          tr.className = 'trace-batch-row';
+          tr.dataset.pid = ing.pid;
+          tr.dataset.stockId = b.stock_id;
+          tr.innerHTML = `
+            <td><input type="checkbox" class="trace-batch-check"></td>
+            <td>${b.location || '-'}</td>
+            <td>${b.lot || '-'}</td>
+            <td>${b.production_date || '-'}</td>
+            <td>${b.expiration_date || '-'}</td>
+            <td>${b.quantity}${uomSuffix}</td>
+            <td><input type="number" class="trace-batch-qty" min="0" max="${b.quantity}" step="any" value="0" disabled></td>
+          `;
+          const checkbox = tr.querySelector('.trace-batch-check');
+          const qtyInput = tr.querySelector('.trace-batch-qty');
+
+          checkbox.addEventListener('change', () => {
+            qtyInput.disabled = !checkbox.checked;
+            qtyInput.value = checkbox.checked ? b.quantity : 0;
+            updateIngredientProgress(ing.pid);
+          });
+          qtyInput.addEventListener('input', () => {
+            let val = parseFloat(qtyInput.value) || 0;
+            if (val > b.quantity) val = b.quantity;
+            if (val < 0) val = 0;
+            qtyInput.value = val;
+            updateIngredientProgress(ing.pid);
+          });
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      block.appendChild(table);
+      traceabilityIngredientsWrap.appendChild(block);
+    });
+
+    traceabilityFormError.classList.remove('show');
+    traceabilityModal.classList.add('open');
+  }
+
+  async function openTraceabilitySelection(recipeId, runs) {
+    try {
+      const response = await fetch(`/get_recipe_ingredient_batches?recipe_id=${recipeId}&runs=${runs}`);
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.error || 'Could not load ingredient stock.');
+        return;
+      }
+      renderTraceabilityModal(data.ingredients, recipeId, runs);
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while loading ingredient stock.');
+    }
+  }
+
+  cancelTraceabilityBtn.addEventListener('click', () => {
+    traceabilityModal.classList.remove('open');
+    traceabilityContext = null;
+  });
+  traceabilityModal.addEventListener('click', (e) => {
+    if (e.target === traceabilityModal) {
+      traceabilityModal.classList.remove('open');
+      traceabilityContext = null;
+    }
+  });
+
+  confirmTraceabilityBtn.addEventListener('click', () => {
+    if (!traceabilityContext) return;
+
+    const selectedStock = [];
+    let allCovered = true;
+
+    traceabilityContext.ingredients.forEach(ing => {
+      const total = ingredientSelectedTotal(ing.pid);
+      if (total < ing.needed) allCovered = false;
+
+      traceabilityIngredientsWrap
+        .querySelectorAll(`.trace-batch-row[data-pid="${ing.pid}"]`)
+        .forEach(row => {
+          const qty = parseFloat(row.querySelector('.trace-batch-qty').value) || 0;
+          if (qty > 0) {
+            selectedStock.push({ pid: ing.pid, stock_id: parseInt(row.dataset.stockId, 10), quantity: qty });
+          }
+        });
+    });
+
+    if (!allCovered) {
+      traceabilityFormError.classList.add('show');
+      return;
+    }
+    traceabilityFormError.classList.remove('show');
+
+    const { recipeId, runs } = traceabilityContext;
+    traceabilityModal.classList.remove('open');
+    traceabilityContext = null;
+    runRecipeExecution(recipeId, runs, false, selectedStock);
+  });
+
+</script>
+
+{% endblock %}

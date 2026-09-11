@@ -1,0 +1,960 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Contacts
+{% endblock %}
+
+{% block styles %}
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Extra styles for the Suppliers & Customers page --- */
+
+    .sc-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .sc-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .btn-add-new {
+      padding: 12px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+
+    .sc-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .sc-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .sc-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .sc-sort-wrap select:focus {
+      border-color: #111;
+    }
+
+    .sc-search-wrap {
+      position: relative;
+      flex: 0 1 320px;
+    }
+    .sc-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .sc-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .sc-search-wrap .sc-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* Table, styled the same way as the Order History table */
+    .sc-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .sc-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .sc-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .sc-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .sc-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .sc-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .sc-table-wrapper tbody tr.sc-row {
+      cursor: pointer;
+    }
+    .sc-table-wrapper tbody tr:hover {
+      background: #fafafa;
+    }
+    .sc-table-wrapper .no-products-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .sc-table-wrapper .remove-btn {
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .sc-table-wrapper .remove-btn:hover {
+      background: #c82333;
+    }
+    .sc-table-wrapper .remove-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Contact details modal */
+    .modal-box.contact-details-box {
+      width: 560px;
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .contact-details-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 20px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .contact-details-meta div span.label {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .contact-details-meta div span.value {
+      font-size: 14px;
+      color: #111;
+    }
+    .contact-details-meta div.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .type-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+    .type-pill.supplier {
+      background: #eef1ff;
+      color: #3547d1;
+    }
+    .type-pill.customer {
+      background: #e6f6ea;
+      color: #1a7f37;
+    }
+
+    /* --- Modal, styled the same way as the New Order form --- */
+    .modal-box.contact-modal-box {
+      width: 640px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+
+    .form-section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      font-weight: 700;
+      margin: 0 0 14px;
+    }
+
+    .contact-modal-box .field-row {
+      margin-bottom: 18px;
+    }
+    .contact-modal-box .field-row.cols-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .contact-modal-box .field-row.cols-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .contact-modal-box .field-row.single {
+      grid-template-columns: 1fr;
+    }
+    .contact-modal-box .field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      background: #fff;
+      color: #111;
+    }
+    .contact-modal-box hr {
+      margin: 20px 0;
+    }
+
+    /* =======================================================
+       Page shell — matches the redesigned header/card pattern
+       used on the Home, Stock, Order History, Products,
+       Recipes, and Execution History pages, built on top of
+       layout.html's design system.
+       ======================================================= */
+    .sc-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .sc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .sc-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .sc-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing Add New + sort + search */
+    .sc-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .sc-toolbar-card .sc-topbar {
+      margin-bottom: 0;
+    }
+    .sc-toolbar-card .sc-topbar h2 {
+      display: none; /* replaced by .sc-header h1 above */
+    }
+    .sc-toolbar-card .sc-topbar-actions {
+      margin-left: 0;
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .sc-toolbar-card .btn-add-new {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      background: #1c1c1c !important;
+      color: #fff !important;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .sc-toolbar-card .btn-add-new:hover {
+      background: #303030 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .sc-toolbar-card .btn-add-new svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .sc-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .sc-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .sc-toolbar-card .sc-topbar-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .sc-toolbar-card .btn-add-new {
+        width: 100%;
+        justify-content: center;
+      }
+      .sc-toolbar-card .sc-search-wrap input {
+        width: 100%;
+      }
+      .sc-toolbar-card,
+      .sc-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="sc-wrap">
+
+  <div class="sc-header">
+    <div>
+      <p class="greeting-eyebrow">Contacts</p>
+      <h1>Suppliers &amp; Customers</h1>
+    </div>
+  </div>
+
+  <div class="sc-toolbar-card">
+    <div class="sc-topbar">
+      <h2>Contacts</h2>
+      <div class="sc-topbar-actions">
+        <button class="btn-primary btn-add-new" id="openFormBtn" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+          Add New
+        </button>
+        <div class="sc-sort-wrap">
+          <label for="sc-sort-select">Sort By</label>
+          <select id="sc-sort-select">
+            <option value="name_asc" selected>Name (A–Z)</option>
+            <option value="name_desc">Name (Z–A)</option>
+            <option value="address_asc">Address (A–Z)</option>
+            <option value="address_desc">Address (Z–A)</option>
+            <option value="activity_asc">Activity (A–Z)</option>
+            <option value="activity_desc">Activity (Z–A)</option>
+          </select>
+        </div>
+        <div class="sc-search-wrap">
+          <span class="sc-search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+</svg></span>
+          <input type="text" id="sc-search-input" placeholder="Search contacts...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sc-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Contacts</h2>
+      <span class="section-sub">{{ rows|length if rows else 0 }} total</span>
+    </div>
+    <div class="sc-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>VAT Number</th>
+          <th>Address</th>
+          <th>Phone Number</th>
+          <th>Activity</th>
+          <th>Type</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="productsTableBody">
+        {% if rows %}
+          {% for rows in rows %}
+            <tr class="sc-row" data-contact-id="{{ rows['id'] if rows['id'] is defined else loop.index0 }}" data-name="{{ rows['name'] }}" data-address="{{ rows['address'] }}" data-activity="{{ rows['activity'] }}">
+              <td class="product-name">{{ rows["name"] }}</td>
+              <td>{{ rows["afm"] }}</td>
+              <td>{{ rows["address"] }}</td>
+              <td>{{ rows["phone"] }}</td>
+              <td>{{ rows["activity"] }}</td>
+              <td>
+                {% if rows["supplier"] == 1 %}
+                  <span class="type-pill supplier">Supplier</span>
+                {% else %}
+                  <span class="type-pill customer">Customer</span>
+                {% endif %}
+              </td>
+              <td>
+                <button type="button" class="remove-btn" data-contact-id="{{ rows['id'] if rows['id'] is defined else loop.index0 }}">Remove</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-products-row">
+            <td colspan="7">No suppliers or customers available.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <script type="application/json" id="contacts-data">{{ rows | default([]) | tojson }}</script>
+
+  <!-- Contact details modal -->
+  <div class="modal-overlay" id="details-overlay">
+    <div class="modal-box contact-details-box">
+      <h3>Contact Details</h3>
+
+      <h4 class="form-section-title">Contact Information</h4>
+      <div class="contact-details-meta" id="contact-details-info">
+        <!-- filled in by JS -->
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Company Information</h4>
+      <div class="contact-details-meta" id="contact-details-company">
+        <!-- filled in by JS -->
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="closeDetailsBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Contact modal -->
+  <div class="modal-overlay" id="overlay">
+    <div class="modal-box contact-modal-box">
+      <h3>New Contact</h3>
+
+      <form id="productForm" action="/add_sucu" method="POST">
+
+        <h4 class="form-section-title">Contact Information</h4>
+
+        <div class="field-row cols-2">
+          <div class="field">
+            <label for="Type">Contact Type</label>
+            <select id="Type" name="type" required>
+              <option value="">Select Type</option>
+              <option value="supplier">Supplier</option>
+              <option value="customer">Customer</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="FullName">Full Name</label>
+            <input type="text" id="FullName" placeholder="Full Name" name="full_name" required>
+          </div>
+        </div>
+
+        <div class="field-row cols-3">
+          <div class="field">
+            <label for="Email">Email Address</label>
+            <input type="email" id="Email" placeholder="Email Address" name="email">
+          </div>
+          <div class="field">
+            <label for="Phone">Phone Number</label>
+            <input type="text" id="Phone" placeholder="Phone Number" name="phone">
+          </div>
+          <div class="field">
+            <label for="Mobile">Mobile Number</label>
+            <input type="text" id="Mobile" placeholder="Mobile Number" name="mobile">
+          </div>
+        </div>
+
+        <hr>
+
+        <h4 class="form-section-title">Company Information</h4>
+
+        <div class="field-row cols-2">
+          <div class="field">
+            <label for="CompanyName">Company Name</label>
+            <input type="text" id="CompanyName" placeholder="Company Name" name="company_name" required>
+          </div>
+          <div class="field">
+            <label for="Activity">Activity</label>
+            <input type="text" id="Activity" placeholder="Activity" name="activity">
+          </div>
+        </div>
+
+        <div class="field-row cols-2">
+          <div class="field">
+            <label for="VATNumber">VAT Number</label>
+            <input type="text" id="VATNumber" placeholder="VAT Number" name="vat_number" required>
+          </div>
+          <div class="field">
+            <label for="Address">Address</label>
+            <input type="text" id="Address" placeholder="Address" name="address">
+          </div>
+        </div>
+
+        <div class="field-row cols-3">
+          <div class="field">
+            <label for="City">City</label>
+            <input type="text" id="City" placeholder="City" name="city">
+          </div>
+          <div class="field">
+            <label for="PostalCode">Postal Code</label>
+            <input type="text" id="PostalCode" placeholder="Postal Code" name="postal_code">
+          </div>
+          <div class="field">
+            <label for="Country">Country</label>
+            <input type="text" id="Country" placeholder="Country" name="country">
+          </div>
+        </div>
+
+        <div class="field-row single">
+          <div class="field">
+            <label for="Description">Description</label>
+            <textarea id="Description" name="description" rows="3" placeholder="Description"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveBtn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script>
+  const openBtn = document.getElementById('openFormBtn');
+  const overlay = document.getElementById('overlay');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  openBtn.addEventListener('click', () => {
+    overlay.classList.add('open');
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    overlay.classList.remove('open');
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+
+  // ---- Contact data ----
+  const contactsData = JSON.parse(document.getElementById('contacts-data').textContent);
+
+  function findContact(contactId) {
+    return contactsData.find((c, idx) => {
+      const id = (c.id !== undefined) ? c.id : idx;
+      return String(id) === String(contactId);
+    });
+  }
+
+  function typeLabel(contact) {
+    if (contact.type) return contact.type.charAt(0).toUpperCase() + contact.type.slice(1);
+    return contact.supplier == 1 ? 'Supplier' : 'Customer';
+  }
+
+  // ---- Contact details modal ----
+  const detailsOverlay = document.getElementById('details-overlay');
+  const closeDetailsBtn = document.getElementById('closeDetailsBtn');
+  const contactDetailsInfo = document.getElementById('contact-details-info');
+  const contactDetailsCompany = document.getElementById('contact-details-company');
+
+  function displayValue(value) {
+    if (value === null || value === undefined) return '-';
+    const str = String(value).trim();
+    return str === '' ? '-' : str;
+  }
+
+  function escapeHtml(unsafe) {
+    if (unsafe == null) return '';
+      return String(unsafe)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+  }
+
+  function openContactDetails(contactId) {
+      const contact = findContact(contactId);
+      if (!contact) return;
+
+      const typeOptions = `
+          <option value="supplier" ${contact.supplier == 1 ? 'selected' : ''}>Supplier</option>
+          <option value="customer" ${contact.supplier == 0 ? 'selected' : ''}>Customer</option>
+      `;
+
+      contactDetailsInfo.innerHTML = `
+          <div><span class="label">Contact Type</span>
+              <select id="edit-type" class="value" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+                  ${typeOptions}
+              </select>
+          </div>
+          <div><span class="label">Full Name</span>
+              <input type="text" id="edit-full_name" class="value" value="${escapeHtml(contact.full_name || contact.name || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">Email Address</span>
+              <input type="email" id="edit-email" class="value" value="${escapeHtml(contact.email || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">Phone Number</span>
+              <input type="text" id="edit-phone" class="value" value="${escapeHtml(contact.phone || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">Mobile Number</span>
+              <input type="text" id="edit-mobile" class="value" value="${escapeHtml(contact.mobile || contact.sphone || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+      `;
+
+      contactDetailsCompany.innerHTML = `
+          <div><span class="label">Company Name</span>
+              <input type="text" id="edit-company_name" class="value" value="${escapeHtml(contact.name || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">Activity</span>
+              <input type="text" id="edit-activity" class="value" value="${escapeHtml(contact.activity || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">VAT Number</span>
+              <input type="text" id="edit-vat_number" class="value" value="${escapeHtml(contact.afm || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">Address</span>
+              <input type="text" id="edit-address" class="value" value="${escapeHtml(contact.address || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">City</span>
+              <input type="text" id="edit-city" class="value" value="${escapeHtml(contact.city || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">Postal Code</span>
+              <input type="text" id="edit-postal_code" class="value" value="${escapeHtml(contact.postal_code || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div><span class="label">Country</span>
+              <input type="text" id="edit-country" class="value" value="${escapeHtml(contact.country || '')}" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;">
+          </div>
+          <div class="full-width"><span class="label">Description</span>
+              <textarea id="edit-description" class="value" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px; resize:vertical;">${escapeHtml(contact.description || '')}</textarea>
+          </div>
+      `;
+
+      // Ensure a Save button exists
+      const actionsDiv = document.querySelector('.modal-actions');
+      let saveBtn = document.getElementById('saveEditBtn');
+      if (!saveBtn) {
+          saveBtn = document.createElement('button');
+          saveBtn.id = 'saveEditBtn';
+          saveBtn.className = 'btn-primary';
+          saveBtn.textContent = 'Save';
+          actionsDiv.insertBefore(saveBtn, document.getElementById('closeDetailsBtn'));
+      }
+      // Store the contact ID for the save operation
+      window.currentEditContactId = contactId;
+      saveBtn.onclick = function() {
+          saveContactEdit();
+      };
+
+      detailsOverlay.classList.add('open');
+  }
+
+
+  function saveContactEdit() {
+    const contactId = window.currentEditContactId;
+    if (!contactId) return;
+
+    const type = document.getElementById('edit-type').value;
+    const full_name = document.getElementById('edit-full_name').value;
+    const email = document.getElementById('edit-email').value;
+    const phone = document.getElementById('edit-phone').value;
+    const mobile = document.getElementById('edit-mobile').value;
+    const company_name = document.getElementById('edit-company_name').value;
+    const activity = document.getElementById('edit-activity').value;
+    const vat_number = document.getElementById('edit-vat_number').value;
+    const address = document.getElementById('edit-address').value;
+    const city = document.getElementById('edit-city').value;
+    const postal_code = document.getElementById('edit-postal_code').value;
+    const country = document.getElementById('edit-country').value;
+    const description = document.getElementById('edit-description').value;
+
+    if (!company_name || !vat_number || !full_name) {
+        alert('Company Name, VAT Number, and Full Name are required.');
+        return;
+    }
+
+    const payload = {
+        contact_id: contactId,
+        type: type,
+        full_name: full_name,
+        email: email,
+        phone: phone,
+        mobile: mobile,
+        company_name: company_name,
+        activity: activity,
+        vat_number: vat_number,
+        address: address,
+        city: city,
+        postal_code: postal_code,
+        country: country,
+        description: description
+    };
+
+    const saveBtn = document.getElementById('saveEditBtn');
+    if (saveBtn) saveBtn.disabled = true;
+
+    fetch('/edit_sucu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the table row
+            const row = document.querySelector(`tr.sc-row[data-contact-id="${contactId}"]`);
+            if (row) {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 7) {
+                    cells[0].textContent = company_name;
+                    cells[1].textContent = vat_number;
+                    cells[2].textContent = address;
+                    cells[3].textContent = phone;
+                    cells[4].textContent = activity;
+                    // Keep sort data attributes in sync with the edited values
+                    row.dataset.name = company_name;
+                    row.dataset.address = address;
+                    row.dataset.activity = activity;
+                    // Update type pill
+                    const isSupplier = (type === 'supplier');
+                    const pill = cells[5].querySelector('.type-pill');
+                    if (pill) {
+                        pill.textContent = isSupplier ? 'Supplier' : 'Customer';
+                        pill.className = 'type-pill ' + (isSupplier ? 'supplier' : 'customer');
+                    } else {
+                        cells[5].innerHTML = `<span class="type-pill ${isSupplier ? 'supplier' : 'customer'}">${isSupplier ? 'Supplier' : 'Customer'}</span>`;
+                    }
+                }
+            }
+            // Update contactsData
+            const contact = findContact(contactId);
+            if (contact) {
+                contact.name = company_name;
+                contact.full_name = full_name;
+                contact.afm = vat_number;
+                contact.address = address;
+                contact.phone = phone;
+                contact.activity = activity;
+                contact.supplier = (type === 'supplier') ? 1 : 0;
+                contact.email = email;
+                contact.mobile = mobile;
+                contact.city = city;
+                contact.postal_code = postal_code;
+                contact.country = country;
+                contact.description = description;
+            }
+            closeContactDetails();
+        } else {
+            alert('Error: ' + (data.message || 'Failed to update contact.'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Something went wrong while updating the contact.');
+    })
+    .finally(() => {
+        if (saveBtn) saveBtn.disabled = false;
+    });
+  }
+
+  function closeContactDetails() {
+    detailsOverlay.classList.remove('open');
+    window.currentEditContactId = null;
+  }
+
+  closeDetailsBtn.addEventListener('click', closeContactDetails);
+  detailsOverlay.addEventListener('click', (e) => {
+    if (e.target === detailsOverlay) closeContactDetails();
+  });
+
+  const productsTableBody = document.getElementById('productsTableBody');
+  productsTableBody.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+      // Don't open the details modal when the remove button is clicked.
+      e.stopPropagation();
+      const contactId = removeBtn.dataset.contactId;
+      deleteContact(contactId, removeBtn);
+      return;
+    }
+
+    const row = e.target.closest('.sc-row');
+    if (row) openContactDetails(row.dataset.contactId);
+  });
+
+  function toggleNoContactsRow() {
+    const hasRows = productsTableBody.querySelectorAll('tr.sc-row').length > 0;
+    let noContactsRow = document.getElementById('no-contacts-row');
+
+    if (!hasRows && !noContactsRow) {
+      noContactsRow = document.createElement('tr');
+      noContactsRow.className = 'no-products-row';
+      noContactsRow.id = 'no-contacts-row';
+      noContactsRow.innerHTML = '<td colspan="7">No suppliers or customers available.</td>';
+      productsTableBody.appendChild(noContactsRow);
+    } else if (hasRows && noContactsRow) {
+      noContactsRow.remove();
+    }
+  }
+
+  function deleteContact(contactId, removeBtn) {
+    if (!confirm('Remove this contact? This cannot be undone.')) return;
+
+    removeBtn.disabled = true;
+
+    fetch('/delete_sucu', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_id: contactId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to delete contact');
+        }
+
+        const row = productsTableBody.querySelector(`tr.sc-row[data-contact-id="${contactId}"]`);
+        if (row) row.remove();
+
+        const idx = contactsData.findIndex((c, i) => String((c.id !== undefined) ? c.id : i) === String(contactId));
+        if (idx !== -1) contactsData.splice(idx, 1);
+
+        toggleNoContactsRow();
+        filterContacts();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while removing the contact.');
+        removeBtn.disabled = false;
+      });
+  }
+
+  // ---- Search / filter ----
+  const scSearchInput = document.getElementById('sc-search-input');
+
+  function toggleNoSearchResultsRow(show) {
+    let row = document.getElementById('no-search-results-row');
+    if (show && !row) {
+      row = document.createElement('tr');
+      row.className = 'no-products-row';
+      row.id = 'no-search-results-row';
+      row.innerHTML = '<td colspan="7">No matching contacts found</td>';
+      productsTableBody.appendChild(row);
+    } else if (!show && row) {
+      row.remove();
+    }
+  }
+
+  function filterContacts() {
+    const term = scSearchInput.value.trim().toLowerCase();
+    const rows = productsTableBody.querySelectorAll('tr.sc-row');
+
+    if (rows.length === 0) {
+      toggleNoSearchResultsRow(false);
+      return;
+    }
+
+    let anyVisible = false;
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    toggleNoSearchResultsRow(!anyVisible);
+  }
+
+  scSearchInput.addEventListener('input', filterContacts);
+
+  // ---- Sort dropdown (defaults to Name A–Z) ----
+  const scSortSelect = document.getElementById('sc-sort-select');
+
+  function sortContactRows() {
+    const sortValue = scSortSelect.value || 'name_asc';
+    const rows = Array.from(productsTableBody.querySelectorAll('tr.sc-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      let fieldA, fieldB, ascValue;
+      if (sortValue === 'address_asc' || sortValue === 'address_desc') {
+        fieldA = a.dataset.address; fieldB = b.dataset.address; ascValue = 'address_asc';
+      } else if (sortValue === 'activity_asc' || sortValue === 'activity_desc') {
+        fieldA = a.dataset.activity; fieldB = b.dataset.activity; ascValue = 'activity_asc';
+      } else {
+        fieldA = a.dataset.name; fieldB = b.dataset.name; ascValue = 'name_asc';
+      }
+      const cmp = (fieldA || '').toLowerCase().localeCompare((fieldB || '').toLowerCase());
+      return sortValue === ascValue ? cmp : -cmp;
+    });
+
+    rows.forEach(row => productsTableBody.appendChild(row));
+  }
+
+  scSortSelect.addEventListener('change', sortContactRows);
+
+  // Apply the default sort (Name A–Z) as soon as the page loads
+  sortContactRows();
+</script>
+
+{% endblock %}

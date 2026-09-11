@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<title>ΤΕΦΤΕΡΙ | Sign In</title>
+<link href="/static/styless.css" rel="stylesheet">
+
+</head>
+<body>
+
+<div class="auth-shell">
+
+  <div class="brand-panel">
+    <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" alt="Λογότυπο">
+    <h1>ΤΕΦΤΕΡΙ</h1>
+    <p>The leading platform for stock management & monitoring</p>
+  </div>
+
+  <div class="form-panel">
+
+    <!-- LOGIN -->
+    <div id="loginBlock">
+      <h2 class="page-title">Welcome Back</h2>
+      <p class="page-sub">Sign in to your account to continue.</p>
+
+      <div class="error-msg" id="loginError">Invalid email or password.</div>
+
+      <form id="loginForm" class="active" action="/login" method="POST">
+        <div class="field">
+          <label for="loginUser">Email</label>
+          <div class="input-wrap">
+            <input type="email" id="loginUser" placeholder="Email" name="email" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <input type="password" id="password" placeholder="••••••••" name="password" required>
+            <button type="button" class="toggle-pass" onclick="togglePassword('password', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
+            <circle cx="12" cy="12" r="3"/>
+            </svg></button>
+          </div>
+        </div>
+
+        <div class="remember-row">
+          <label><input type="checkbox"> Remember me</label>
+          <a href="#">Forgot your password?</a>
+        </div>
+
+        <button type="submit" class="submit-btn">Login</button>
+      </form>
+
+      <p class="switch-text">Don't have an account? <button id="suBtn">Sign up here</button></p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  document.getElementById("suBtn").addEventListener("click", function() {
+    window.location.href = "/signup";
+  });
+
+  const eyeOpenSVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
+  <circle cx="12" cy="12" r="3"/>
+</svg>`;
+
+const eyeClosedSVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
+  <circle cx="12" cy="12" r="3"/>
+  <line x1="2" y1="2" x2="22" y2="22"/>
+</svg>`;
+
+function togglePassword(fieldId, btn){
+  const input = document.getElementById(fieldId);
+  if(input.type === 'password'){
+    input.type = 'text';
+    btn.innerHTML = eyeClosedSVG;
+  } else {
+    input.type = 'password';
+    btn.innerHTML = eyeOpenSVG;
+  }
+}
+</script>
+
+</body>
+</html>

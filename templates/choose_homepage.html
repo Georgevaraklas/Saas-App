@@ -1,0 +1,192 @@
+{% extends "settings_base.html" %}
+
+{% block settings_title %}Choose Homepage{% endblock %}
+
+{% block settings_styles %}
+  /* ---- Choose Homepage page ---- */
+  .ch-header {
+    margin-bottom: 28px;
+  }
+  .ch-header h2 {
+    margin: 0 0 4px;
+  }
+  .ch-header .ch-subtitle {
+    margin: 0;
+    color: #888;
+    font-size: 14px;
+  }
+
+  .ch-form {
+    max-width: 480px;
+  }
+
+  .ch-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 22px;
+  }
+  .ch-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+  }
+  .ch-field .ch-hint {
+    font-size: 11px;
+    color: #aaa;
+  }
+
+  .ch-select-wrap {
+    position: relative;
+  }
+  .ch-select {
+    width: 100%;
+    padding: 10px 36px 10px 12px;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #222;
+    background: #fff;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+  }
+  .ch-select:focus {
+    outline: none;
+    border-color: #2952e3;
+    box-shadow: 0 0 0 3px rgba(41, 82, 227, 0.12);
+  }
+  .ch-select-wrap::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #888;
+    border-bottom: 2px solid #888;
+    transform: translateY(-65%) rotate(45deg);
+    pointer-events: none;
+  }
+
+  .ch-actions {
+    display: none;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+  }
+  .ch-actions.ch-visible {
+    display: flex;
+  }
+  .ch-btn {
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .ch-btn-secondary {
+    background: #fff;
+    border-color: #dcdcdc;
+    color: #444;
+  }
+  .ch-btn-secondary:hover {
+    background: #f7f7f7;
+  }
+  .ch-btn-primary {
+    background: #2952e3;
+    color: #fff;
+  }
+  .ch-btn-primary:hover {
+    background: #1f42c2;
+  }
+
+  @media (max-width: 560px) {
+    .ch-form {
+      max-width: 100%;
+    }
+  }
+{% endblock %}
+
+{% block settings_content %}
+{% set current_homepage = current_homepage|default('pending_orders') %}
+
+{% set homepages = [
+  ('pending_orders', 'Pending Orders'),
+  ('stock_inventory', 'Stock Inventory'),
+  ('order_history', 'Order History'),
+  ('products', 'Products'),
+  ('invoices', 'Invoices'),
+  ('contacts', 'Contacts'),
+  ('reports', 'Reports'),
+  ('journal', 'Journal'),
+] %}
+
+<div class="ch-header">
+  <h2>Choose Homepage</h2>
+  <p class="ch-subtitle">Choose the page you land on whenever you sign in.</p>
+</div>
+
+<form class="ch-form" id="chooseHomepageForm" action="/settings/choose-homepage" method="post">
+
+  <div class="ch-field">
+    <label for="homepageSelect">Select homepage</label>
+    <div class="ch-select-wrap">
+      <select id="homepageSelect" name="homepage" class="ch-select ch-track">
+        {% for code, label in homepages %}
+          <option value="{{ code }}" {% if code == current_homepage %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <span class="ch-hint">This is the page you'll see first after logging in.</span>
+  </div>
+
+  <div class="ch-actions" id="chActions">
+    <button type="button" class="ch-btn ch-btn-secondary" id="chCancelBtn">Cancel</button>
+    <button type="submit" class="ch-btn ch-btn-primary">Save changes</button>
+  </div>
+</form>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const chTrackedSelects = document.querySelectorAll('.ch-track');
+    const chActions = document.getElementById('chActions');
+    const chCancelBtn = document.getElementById('chCancelBtn');
+
+    // Remember the value each dropdown started with
+    chTrackedSelects.forEach(function(sel) {
+      sel.dataset.original = sel.value;
+    });
+
+    function chIsDirty() {
+      let dirty = false;
+      chTrackedSelects.forEach(function(sel) {
+        if (sel.value !== sel.dataset.original) dirty = true;
+      });
+      return dirty;
+    }
+
+    function chUpdateActionsVisibility() {
+      chActions.classList.toggle('ch-visible', chIsDirty());
+    }
+
+    chTrackedSelects.forEach(function(sel) {
+      sel.addEventListener('change', chUpdateActionsVisibility);
+    });
+
+    if (chCancelBtn) {
+      chCancelBtn.addEventListener('click', function() {
+        chTrackedSelects.forEach(function(sel) {
+          sel.value = sel.dataset.original;
+        });
+        chUpdateActionsVisibility();
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,1336 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Order History
+{% endblock %}
+
+{% block styles %}
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Extra styles for the Order History page (kept separate from nnorder.css) --- */
+
+    /* A bigger, more spacious table, similar in spirit to the "simple-table"
+       look used on the Products page: full-width, roomy cells, larger type. */
+    .oh-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .oh-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .oh-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .oh-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .oh-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .oh-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .oh-table-wrapper .no-products-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .oh-row {
+      cursor: pointer;
+    }
+    .oh-row:hover {
+      background: #fafafa;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status-pill.paid {
+      background: #e6f6ea;
+      color: #1a7f37;
+    }
+    .status-pill.pending {
+      background: #fdf1e2;
+      color: #b8860b;
+    }
+
+    .type-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #eef1ff;
+      color: #3547d1;
+      text-transform: capitalize;
+    }
+
+    .received-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .received-pill.sales {
+      background: #e6f6ea;
+      color: #1a7f37;
+    }
+    .received-pill.purchase {
+      background: #eef1ff;
+      color: #3547d1;
+    }
+
+    .oh-table-wrapper .remove-btn {
+      font-size: 14px;
+    }
+
+    .view-info-btn {
+      font-size: 12px;
+      background: #3547d1;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .view-info-btn:hover {
+      background: #2a38a8;
+    }
+    .no-transfer-text {
+      color: #999;
+      font-style: italic;
+      font-size: 14px;
+    }
+    .add-transfer-btn {
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 6px;
+      background: #3547d1;
+      color: #fff;
+      cursor: pointer;
+      padding: 0;
+      transition: background 0.15s ease;
+    }
+    .add-transfer-btn:hover {
+      background: #2a38a8;
+    }
+    .add-transfer-btn svg {
+      width: 16px;
+      height: 16px;
+      pointer-events: none;
+    }
+
+    /* --- Transfer Info view modal (read-only), same pattern as Invoices --- */
+    .modal-box.transfer-view-box {
+      width: 480px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    /* One block per saved transfer entry - an order can have several now,
+       so each gets its own header (with a per-entry Delete button) and a
+       divider from the entry before it. */
+    #transfer-view-entries {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .transfer-view-entry:not(:first-child) {
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+    .transfer-view-entry-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .transfer-view-entry-header h4 {
+      margin: 0;
+    }
+    .transfer-view-entry-delete {
+      padding: 4px 12px;
+      font-size: 12px;
+    }
+    .transfer-view-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 20px;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .transfer-view-meta div span.label {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .transfer-view-meta div span.value {
+      font-size: 14px;
+      color: #111;
+    }
+    .transfer-view-box hr {
+      margin: 18px 0;
+    }
+    .form-section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      font-weight: 700;
+      margin: 0 0 14px;
+    }
+
+    /* Delete button in the Transfer Info modal footer */
+    .transfer-view-box .modal-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .transfer-view-box .modal-actions-right {
+      display: flex;
+      gap: 10px;
+    }
+    .btn-danger {
+      background: #fff;
+      color: #d92d20;
+      border: 1px solid #f3a9a1;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .btn-danger:hover {
+      background: #d92d20;
+      color: #fff;
+      border-color: #d92d20;
+    }
+
+    /* --- Add Transfer Info modal (for an order that has none yet) --- */
+    .modal-box.transfer-modal-box {
+      width: 560px;
+      max-width: 90vw;
+      max-height: 85vh;
+      overflow-y: auto;
+    }
+    .transfer-modal-box .field-row {
+      margin-bottom: 16px;
+    }
+    .transfer-modal-box .field-row.cols-2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .transfer-modal-box .field-row.cols-3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .transfer-modal-box .field-row.cols-4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+    .transfer-modal-box hr {
+      margin: 18px 0;
+    }
+    .transfer-modal-box .form-section-title {
+      margin-top: 4px;
+    }
+
+    /* --- "Add More" side-by-side layout ---------------------------------
+       When "Add More" is clicked from the read-only Transfer Info view,
+       the Add Transfer Info form is moved into the same overlay, right
+       next to the view box, instead of replacing it. Only this flow adds
+       the "side-by-side" class - the normal "+" button still opens a
+       plain, centered Add Transfer Info modal on its own. */
+    .modal-overlay.side-by-side {
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 24px;
+      overflow: auto;
+      padding: 40px 20px;
+    }
+    .modal-overlay.side-by-side .modal-box {
+      flex-shrink: 0;
+    }
+    /* Only the newly-added Add Transfer Info box fades/slides in here -
+       scoped to .transfer-modal-box specifically (not the generic
+       .modal-box every box shares) so the existing, already-visible view
+       box is never touched by this and can't get caught starting from
+       opacity: 0 too. */
+    .modal-overlay.side-by-side .transfer-modal-box {
+      opacity: 0;
+      transform: translateX(-16px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .modal-overlay.side-by-side .transfer-modal-box.side-by-side-in {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    /* --- Top bar layout + search box --- */
+    .mtopbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .mtopbar .right-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-left: auto;
+    }
+    .mtopbar .oh-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .mtopbar .oh-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .mtopbar .oh-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .mtopbar .oh-sort-wrap select:focus {
+      border-color: #111;
+    }
+    .oh-search-wrap {
+      position: relative;
+      flex: 0 1 320px;
+    }
+    .oh-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .oh-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .oh-search-wrap .oh-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* Order details modal needs a bit more room than the add-item modal */
+    .modal-box.order-details-box {
+      width: 560px;
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    .order-details-meta {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px 20px;
+      margin-bottom: 18px;
+      font-size: 13px;
+    }
+    .order-details-meta div span.label {
+      display: block;
+      color: #888;
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+    .order-details-meta div span.value {
+      font-size: 14px;
+      color: #111;
+    }
+
+    .order-details-box table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+    }
+    .order-details-box thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .order-details-box thead th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .order-details-box tbody td {
+      padding: 10px 12px;
+      font-size: 13px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .order-details-total {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      font-size: 14px;
+      margin-top: 6px;
+    }
+    .order-details-total b {
+      font-size: 16px;
+    }
+
+    /* =======================================================
+       Page shell — matches the redesigned header/card pattern
+       used on the Home, Stock, Products, Recipes, Execution
+       History, Suppliers & Customers, Journal, and Alerts
+       pages, built on top of layout.html's design system.
+       ======================================================= */
+    .oh-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .oh-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .oh-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .oh-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing New Order + sort + search */
+    .oh-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .oh-toolbar-card .mtopbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .oh-toolbar-card .mtopbar h2 {
+      display: none; /* replaced by .oh-header h1 above */
+    }
+    .oh-toolbar-card .left-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .oh-toolbar-card .left-buttons .btn-primary-dark {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      background: #1c1c1c;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .oh-toolbar-card .left-buttons .btn-primary-dark:hover {
+      background: #303030;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .oh-toolbar-card .left-buttons .btn-primary-dark svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .oh-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .oh-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .oh-toolbar-card .mtopbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .oh-toolbar-card .left-buttons {
+        width: 100%;
+      }
+      .oh-toolbar-card .left-buttons .btn-primary-dark {
+        width: 100%;
+        justify-content: center;
+      }
+      .oh-toolbar-card .right-controls {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .oh-search-wrap input {
+        width: 100%;
+      }
+      .oh-toolbar-card,
+      .oh-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="oh-wrap">
+
+  <div class="oh-header">
+    <div>
+      <p class="greeting-eyebrow">Inventory</p>
+      <h1>Order History</h1>
+    </div>
+  </div>
+
+  <div class="oh-toolbar-card">
+    <div class="mtopbar">
+      <h2>Order History</h2>
+      <div class="left-buttons">
+        <button class="btn-primary-dark" id="neworderBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+          New Order
+        </button>
+      </div>
+      <div class="right-controls">
+        <div class="oh-sort-wrap">
+          <label for="oh-sort-select">Sort By</label>
+          <select id="oh-sort-select">
+            <option value="issue_date_desc" selected>Issue Date (Newest First)</option>
+            <option value="issue_date_asc">Issue Date (Oldest First)</option>
+            <option value="due_date_desc">Due Date (Newest First)</option>
+            <option value="due_date_asc">Due Date (Oldest First)</option>
+            <option value="name_asc">Client Name (A–Z)</option>
+            <option value="name_desc">Client Name (Z–A)</option>
+          </select>
+        </div>
+        <div class="oh-search-wrap">
+          <span class="oh-search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+</svg></span>
+          <input type="text" id="oh-search-input" placeholder="Search orders...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="oh-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Orders</h2>
+      <span class="section-sub">{{ orders|length if orders else 0 }} total</span>
+    </div>
+    <div class="oh-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Order ID</th>
+          <th>Client Name</th>
+          <th>VAT Number</th>
+          <th>Order Type</th>
+          <th>Invoice Type</th>
+          <th>Payment Status</th>
+          <th>Issue Date</th>
+          <th>Due Date</th>
+          <th>Transfer Info</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="order-history-body">
+        {% if orders %}
+          {% for order in orders %}
+            <tr class="oh-row" data-order-id="{{ order.oid }}" data-customer="{{ order.customer_name }}" data-issue-date="{{ order.rdate }}" data-due-date="{{ order.edate }}">
+              <td>{{ order.oid }}</td>
+              <td class="product-name">{{ order.customer_name }}</td>
+              <td>{{ order.cafm }}</td>
+              <td><span class="type-pill">{{ order.order_type }}</span></td>
+              <td>
+                {% if order.receive in [1, '1', true] %}
+                  <span class="received-pill purchase">Purchase Invoice</span>
+                {% else %}
+                  <span class="received-pill sales">Sales Invoice</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if order.pstatus == 'Paid' %}
+                  <span class="status-pill paid">{{ order.pstatus }}</span>
+                {% else %}
+                  <span class="status-pill pending">{{ order.pstatus }}</span>
+                {% endif %}
+              </td>
+              <td>{{ order.rdate }}</td>
+              <td>{{ order.edate }}</td>
+              <td>
+                {% if order.transfer_infos or order.tcompany %}
+                  <button type="button" class="view-info-btn" data-order-id="{{ order.oid }}">View Info</button>
+                {% else %}
+                  <button type="button" class="add-transfer-btn" data-order-id="{{ order.oid }}" title="Add Transfer Info">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+                      <path d="M8 0a1 1 0 0 1 1 1v6h6a1 1 0 1 1 0 2H9v6a1 1 0 1 1-2 0V9H1a1 1 0 0 1 0-2h6V1a1 1 0 0 1 1-1z"/>
+                    </svg>
+                  </button>
+                {% endif %}
+              </td>
+              <td>
+                <button type="button" class="remove-btn" data-order-id="{{ order.oid }}">Remove</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-products-row" id="no-orders-row">
+            <td colspan="10">No orders found</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- Order details modal -->
+  <div class="modal-overlay" id="order-modal-overlay">
+    <div class="modal-box order-details-box">
+      <h3>Order Details</h3>
+
+      <div class="order-details-meta" id="order-details-meta">
+        <!-- filled in by JS -->
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>SKU</th>
+            <th>Price</th>
+            <th>LOT Number</th>
+            <th>Quantity</th>
+            <th>Subtotal</th>
+          </tr>
+        </thead>
+        <tbody id="order-details-products-body">
+          <!-- filled in by JS -->
+        </tbody>
+      </table>
+
+      <div class="order-details-total">
+        <span>Total:</span>
+        <b id="order-details-total-amount">$0.00</b>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="close-order-modal-btn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Transfer Info view modal (read-only, shows saved transfer info for an order) -->
+  <div class="modal-overlay" id="transfer-view-overlay">
+    <div class="modal-box transfer-view-box">
+      <h3>Transfer Information</h3>
+
+      <!-- An order can have multiple transfer entries now; JS renders one
+           .transfer-view-entry block per entry here, each with its own
+           Loading/Destination/Transport sections and Delete button. -->
+      <div id="transfer-view-entries">
+        <!-- filled in by JS -->
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="transferViewAddMoreBtn" type="button">Add More</button>
+        <button class="btn-secondary" id="transferViewCloseBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Transfer Info modal (for an order that has none yet) -->
+  <div class="modal-overlay" id="add-transfer-overlay">
+    <div class="modal-box transfer-modal-box">
+      <h3>Transfer Information</h3>
+
+      <h4 class="form-section-title">Loading Location</h4>
+      <div class="field-row cols-3">
+        <div class="field">
+          <label for="AddTILoadingAddress">Address</label>
+          <input type="text" id="AddTILoadingAddress" placeholder="Address">
+        </div>
+        <div class="field">
+          <label for="AddTILoadingCity">City</label>
+          <input type="text" id="AddTILoadingCity" placeholder="City">
+        </div>
+        <div class="field">
+          <label for="AddTILoadingPostalCode">Postal Code</label>
+          <input type="text" id="AddTILoadingPostalCode" placeholder="Postal Code">
+        </div>
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Place of Destination</h4>
+      <div class="field-row cols-4">
+        <div class="field">
+          <label for="AddTIDestinationAddress">Address</label>
+          <input type="text" id="AddTIDestinationAddress" placeholder="Address">
+        </div>
+        <div class="field">
+          <label for="AddTIDestinationCity">City</label>
+          <input type="text" id="AddTIDestinationCity" placeholder="City">
+        </div>
+        <div class="field">
+          <label for="AddTIDestinationPostalCode">Postal Code</label>
+          <input type="text" id="AddTIDestinationPostalCode" placeholder="Postal Code">
+        </div>
+        <div class="field">
+          <label for="AddTIDestinationCountry">Country</label>
+          <input type="text" id="AddTIDestinationCountry" placeholder="Country">
+        </div>
+      </div>
+
+      <hr>
+
+      <h4 class="form-section-title">Mode of Transport</h4>
+      <div class="field-row cols-2">
+        <div class="field">
+          <label for="AddTITransportCompany">Transport Company</label>
+          <input type="text" id="AddTITransportCompany" placeholder="Transport Company">
+        </div>
+        <div class="field">
+          <label for="AddTITransportNumber">Transport Number</label>
+          <input type="text" id="AddTITransportNumber" placeholder="Transport Number">
+        </div>
+      </div>
+      <div class="field-row cols-2">
+        <div class="field">
+          <label for="AddTITransferStartDate">Start Date of Transfer</label>
+          <input type="date" id="AddTITransferStartDate">
+        </div>
+        <div class="field">
+          <label for="AddTITransferStartTime">Start Time of Transfer</label>
+          <input type="time" id="AddTITransferStartTime">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="addTransferCloseBtn" type="button">Close</button>
+        <button class="btn-primary" id="addTransferSaveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script type="application/json" id="orders-data">{{ orders | default([]) | tojson }}</script>
+
+<script>
+  const ordersData = JSON.parse(document.getElementById('orders-data').textContent);
+
+  // Account's chosen currency (ISO code), passed from the server.
+  // Falls back to USD if the account/currency isn't set for any reason.
+  const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
+
+  // Mirrors the symbol set in currency_filter.py - keep the two in sync.
+  // Only currencies with a widely-recognized, unambiguous symbol are
+  // listed; everything else falls back to its 3-letter ISO code.
+  const CURRENCY_SYMBOLS = {
+    USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', CHF: 'CHF',
+    INR: '₹', KRW: '₩', VND: '₫', TRY: '₺', ILS: '₪', THB: '฿', PHP: '₱'
+  };
+
+  // Formats a numeric amount as "1,234.56 $" / "42.00 PLN", using the
+  // account's currency. No conversion - the stored amount is shown as-is,
+  // just labeled with the right symbol/code (same behavior as the
+  // `currency` Jinja filter used elsewhere in the app).
+  function formatMoney(value) {
+    const num = parseFloat(value);
+    const amount = isNaN(num) ? 0 : num;
+    const formattedNumber = amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    const label = CURRENCY_SYMBOLS[accountCurrency] || accountCurrency;
+    return `${formattedNumber} ${label}`;
+  }
+
+  function findOrder(orderId) {
+    return ordersData.find(o => String(o.oid) === String(orderId));
+  }
+
+  // ---- Order details modal ----
+  const orderModalOverlay = document.getElementById('order-modal-overlay');
+  const closeOrderModalBtn = document.getElementById('close-order-modal-btn');
+  const orderDetailsMeta = document.getElementById('order-details-meta');
+  const orderDetailsProductsBody = document.getElementById('order-details-products-body');
+  const orderDetailsTotalAmount = document.getElementById('order-details-total-amount');
+
+  function openOrderModal(orderId) {
+    const order = findOrder(orderId);
+    if (!order) return;
+
+    orderDetailsMeta.innerHTML = `
+      <div><span class="label">Order ID</span><span class="value">${order.oid}</span></div>
+      <div><span class="label">Client Name</span><span class="value">${order.customer_name || ''}</span></div>
+      <div><span class="label">VAT Number</span><span class="value">${order.cafm || ''}</span></div>
+      <div><span class="label">Order Type</span><span class="value">${order.order_type || ''}</span></div>
+      <div><span class="label">Invoice Type</span><span class="value">${(order.receive == 1 || order.receive == '1') ? 'Purchase Invoice' : 'Sales Invoice'}</span></div>
+      <div><span class="label">Payment Status</span><span class="value">${order.pstatus || ''}</span></div>
+      <div><span class="label">Issue Date</span><span class="value">${order.rdate || ''}</span></div>
+      <div><span class="label">Due Date</span><span class="value">${order.edate || ''}</span></div>
+    `;
+
+    const products = order.products || [];
+    orderDetailsProductsBody.innerHTML = '';
+    let total = 0;
+
+    if (products.length === 0) {
+      orderDetailsProductsBody.innerHTML = `
+        <tr class="no-products-row"><td colspan="6">No products found</td></tr>
+      `;
+    } else {
+      products.forEach(p => {
+        const price = parseFloat(p.price) || 0;
+        const quantity = parseInt(p.quantity, 10) || 0;
+        const subtotal = (p.total !== undefined) ? parseFloat(p.total) : price * quantity;
+        total += subtotal;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="product-name">${p.name || ''}</td>
+          <td class="product-sku">${p.sku || '-'}</td>
+          <td>${formatMoney(price)}</td>
+          <td>${p.lot || ''}</td>
+          <td class="quantity-cell">${quantity} Item</td>
+          <td class="subtotal-cell">${formatMoney(subtotal)}</td>
+        `;
+        orderDetailsProductsBody.appendChild(tr);
+      });
+    }
+
+    orderDetailsTotalAmount.textContent = formatMoney(total);
+    orderModalOverlay.classList.add('open');
+  }
+
+  function closeOrderModal() {
+    orderModalOverlay.classList.remove('open');
+  }
+
+  closeOrderModalBtn.addEventListener('click', closeOrderModal);
+  orderModalOverlay.addEventListener('click', (e) => {
+    if (e.target === orderModalOverlay) closeOrderModal();
+  });
+
+  // ---- Transfer Info view modal (read-only) ----
+  const transferViewOverlay = document.getElementById('transfer-view-overlay');
+  const transferViewCloseBtn = document.getElementById('transferViewCloseBtn');
+  const transferViewAddMoreBtn = document.getElementById('transferViewAddMoreBtn');
+  const transferViewEntries = document.getElementById('transfer-view-entries');
+  let currentTransferViewOrderId = null;
+
+  function displayValue(value) {
+    if (value === null || value === undefined) return '-';
+    const str = String(value).trim();
+    return str === '' ? '-' : str;
+  }
+
+  // Renders one block per saved transfer entry into the view modal, each
+  // with its own Loading/Destination/Transport sections and a Delete
+  // button scoped to that entry. Shared by openTransferView() and by the
+  // "Add More" success handler, which refreshes this in place.
+  function renderTransferViewEntries(list) {
+    transferViewEntries.innerHTML = list.map((t, idx) => `
+      <div class="transfer-view-entry" data-transfer-id="${displayValue(t.transfer_id)}">
+        <div class="transfer-view-entry-header">
+          <h4 class="form-section-title">Transfer ${idx + 1}</h4>
+          <button type="button" class="btn-danger transfer-view-entry-delete" data-transfer-id="${displayValue(t.transfer_id)}">Delete</button>
+        </div>
+
+        <h4 class="form-section-title">Loading Location</h4>
+        <div class="transfer-view-meta">
+          <div><span class="label">Address</span><span class="value">${displayValue(t.laddress)}</span></div>
+          <div><span class="label">City</span><span class="value">${displayValue(t.lcity)}</span></div>
+          <div><span class="label">Postal Code</span><span class="value">${displayValue(t.lpostalcode)}</span></div>
+        </div>
+
+        <h4 class="form-section-title">Place of Destination</h4>
+        <div class="transfer-view-meta">
+          <div><span class="label">Address</span><span class="value">${displayValue(t.daddress)}</span></div>
+          <div><span class="label">City</span><span class="value">${displayValue(t.dcity)}</span></div>
+          <div><span class="label">Postal Code</span><span class="value">${displayValue(t.dpostalcode)}</span></div>
+          <div><span class="label">Country</span><span class="value">${displayValue(t.dcountry)}</span></div>
+        </div>
+
+        <h4 class="form-section-title">Mode of Transport</h4>
+        <div class="transfer-view-meta">
+          <div><span class="label">Transport Company</span><span class="value">${displayValue(t.tcompany)}</span></div>
+          <div><span class="label">Transport Number</span><span class="value">${displayValue(t.tnumber)}</span></div>
+          <div><span class="label">Start Date of Transfer</span><span class="value">${displayValue(t.sdate)}</span></div>
+          <div><span class="label">Start Time of Transfer</span><span class="value">${displayValue(t.stime)}</span></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function openTransferView(orderId) {
+    const order = findOrder(orderId);
+    if (!order) return;
+
+    // Prefer the full list of transfer entries (same shape as Invoices);
+    // fall back to the legacy single "tcompany" field if that's all this
+    // order has.
+    const list = (order.transfer_infos && order.transfer_infos.length > 0)
+      ? order.transfer_infos
+      : (order.tcompany ? [{ tcompany: order.tcompany }] : null);
+    if (!list || list.length === 0) return;
+
+    currentTransferViewOrderId = orderId;
+    renderTransferViewEntries(list);
+    transferViewOverlay.classList.add('open');
+  }
+
+  function closeTransferView() {
+    // If an "Add More" form is sitting open next to the view, tidy it
+    // away instantly along with the view itself.
+    sideBySideAddTransferModal(false);
+    addTransferOrderId = null;
+    addTransferTriggerBtn = null;
+
+    transferViewOverlay.classList.remove('open');
+    currentTransferViewOrderId = null;
+  }
+
+  transferViewCloseBtn.addEventListener('click', closeTransferView);
+  transferViewOverlay.addEventListener('click', (e) => {
+    if (e.target === transferViewOverlay) closeTransferView();
+  });
+
+  // Delete is per-entry now (an order can have several), so this listens
+  // for clicks on whichever entry's Delete button was clicked rather than
+  // a single button for the whole modal.
+  transferViewEntries.addEventListener('click', (e) => {
+    const btn = e.target.closest('.transfer-view-entry-delete');
+    if (!btn || !currentTransferViewOrderId) return;
+    if (!confirm('Delete this transfer info? This cannot be undone.')) return;
+
+    const transferId = btn.dataset.transferId;
+
+    // TODO: wire up to a real backend endpoint once one exists, e.g.:
+    // fetch(`/delete_transfer_info`, { method: 'POST', body: JSON.stringify({ transfer_id: transferId }) })
+    console.log('Delete transfer info entry', transferId, 'for order', currentTransferViewOrderId);
+
+    const order = findOrder(currentTransferViewOrderId);
+    if (order && Array.isArray(order.transfer_infos)) {
+      order.transfer_infos = order.transfer_infos.filter(t => String(t.transfer_id) !== String(transferId));
+    }
+
+    if (order && order.transfer_infos && order.transfer_infos.length > 0) {
+      renderTransferViewEntries(order.transfer_infos);
+    } else {
+      closeTransferView();
+    }
+  });
+
+  transferViewAddMoreBtn.addEventListener('click', () => {
+    if (!currentTransferViewOrderId) return;
+    const orderId = currentTransferViewOrderId;
+    // Keep the view modal open and place the "Add Transfer Info" form
+    // right next to it, instead of closing the view to open a separate,
+    // centered modal. Only this entry point does this - the table's "+"
+    // button still opens the plain, centered Add Transfer Info modal.
+    openAddTransferModal(orderId, null, { sideBySide: true });
+  });
+
+  // ---- Add Transfer Info modal (for an order that has none yet) ----
+  const addTransferOverlay = document.getElementById('add-transfer-overlay');
+  const addTransferCloseBtn = document.getElementById('addTransferCloseBtn');
+  const addTransferSaveBtn = document.getElementById('addTransferSaveBtn');
+  const addTransferBox = addTransferOverlay.querySelector('.transfer-modal-box');
+
+  const addTransferFieldIds = [
+    'AddTILoadingAddress', 'AddTILoadingCity', 'AddTILoadingPostalCode',
+    'AddTIDestinationAddress', 'AddTIDestinationCity', 'AddTIDestinationPostalCode', 'AddTIDestinationCountry',
+    'AddTITransportCompany', 'AddTITransportNumber', 'AddTITransferStartDate', 'AddTITransferStartTime'
+  ];
+
+  let addTransferOrderId = null;
+  let addTransferTriggerBtn = null;
+
+  // True while the Add Transfer Info box has been moved out of its own
+  // overlay and placed next to the Transfer Info view box instead.
+  let addTransferIsSideBySide = false;
+
+  function addTransferFieldValue(id) {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  }
+
+  // Moves the Add Transfer Info box to sit right next to the Transfer
+  // Info view box (open: true), or moves it back to its own overlay
+  // (open: false).
+  function sideBySideAddTransferModal(open) {
+    if (open === addTransferIsSideBySide) return;
+
+    if (open) {
+      addTransferIsSideBySide = true;
+      transferViewOverlay.classList.add('side-by-side');
+      transferViewOverlay.appendChild(addTransferBox);
+      // Force a reflow so the starting (faded-out) state registers
+      // before the "in" class kicks off the transition.
+      void addTransferBox.offsetHeight;
+      requestAnimationFrame(() => {
+        addTransferBox.classList.add('side-by-side-in');
+      });
+    } else {
+      addTransferIsSideBySide = false;
+      addTransferBox.classList.remove('side-by-side-in');
+      transferViewOverlay.classList.remove('side-by-side');
+      addTransferOverlay.appendChild(addTransferBox);
+    }
+  }
+
+  function openAddTransferModal(orderId, triggerBtn, opts) {
+    opts = opts || {};
+    addTransferOrderId = orderId;
+    addTransferTriggerBtn = triggerBtn;
+    addTransferFieldIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    if (opts.sideBySide) {
+      sideBySideAddTransferModal(true);
+    } else {
+      addTransferOverlay.classList.add('open');
+    }
+  }
+
+  function closeAddTransferModal() {
+    if (addTransferIsSideBySide) {
+      sideBySideAddTransferModal(false);
+    } else {
+      addTransferOverlay.classList.remove('open');
+    }
+    addTransferOrderId = null;
+    addTransferTriggerBtn = null;
+  }
+
+  addTransferCloseBtn.addEventListener('click', closeAddTransferModal);
+  addTransferOverlay.addEventListener('click', (e) => {
+    if (e.target === addTransferOverlay) closeAddTransferModal();
+  });
+
+  addTransferSaveBtn.addEventListener('click', () => {
+    if (!addTransferOrderId) return;
+
+    const transferInfo = {
+      laddress: addTransferFieldValue('AddTILoadingAddress'),
+      lcity: addTransferFieldValue('AddTILoadingCity'),
+      lpostalcode: addTransferFieldValue('AddTILoadingPostalCode'),
+      daddress: addTransferFieldValue('AddTIDestinationAddress'),
+      dcity: addTransferFieldValue('AddTIDestinationCity'),
+      dpostalcode: addTransferFieldValue('AddTIDestinationPostalCode'),
+      dcountry: addTransferFieldValue('AddTIDestinationCountry'),
+      tcompany: addTransferFieldValue('AddTITransportCompany'),
+      tnumber: addTransferFieldValue('AddTITransportNumber'),
+      sdate: addTransferFieldValue('AddTITransferStartDate'),
+      stime: addTransferFieldValue('AddTITransferStartTime')
+    };
+
+    const hasAnyValue = Object.values(transferInfo).some(v => v !== '');
+    if (!hasAnyValue) {
+      alert('Please fill in at least one field.');
+      return;
+    }
+
+    const orderId = addTransferOrderId;
+    const triggerBtn = addTransferTriggerBtn;
+
+    addTransferSaveBtn.disabled = true;
+    addTransferSaveBtn.textContent = 'Saving…';
+
+    fetch('/save_transfer_info', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oid: orderId, ...transferInfo })
+    })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to save transfer info');
+        return response.json();
+      })
+      .then(data => {
+        if (!data.success) {
+          alert(data.error || 'Failed to save transfer info');
+          return;
+        }
+
+        // Update local data so the View Info modal reflects the new values.
+        const order = findOrder(orderId);
+        if (order) order.transfer_info = transferInfo;
+
+        // Swap the "+" button for a "View Info" button in the table.
+        if (triggerBtn) {
+          const cell = triggerBtn.closest('td');
+          if (cell) {
+            cell.innerHTML = `<button type="button" class="view-info-btn" data-order-id="${orderId}">View Info</button>`;
+          }
+        }
+
+        closeAddTransferModal();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while saving the transfer info.');
+      })
+      .finally(() => {
+        addTransferSaveBtn.disabled = false;
+        addTransferSaveBtn.textContent = 'Save';
+      });
+  });
+
+  // ---- Row click -> open modal, Remove button -> delete order ----
+  const orderHistoryBody = document.getElementById('order-history-body');
+
+  // ---- Search / filter ----
+  const ohSearchInput = document.getElementById('oh-search-input');
+
+  function toggleNoSearchResultsRow(show) {
+    let row = document.getElementById('no-search-results-row');
+    if (show && !row) {
+      row = document.createElement('tr');
+      row.className = 'no-products-row';
+      row.id = 'no-search-results-row';
+      row.innerHTML = '<td colspan="10">No matching orders found</td>';
+      orderHistoryBody.appendChild(row);
+    } else if (!show && row) {
+      row.remove();
+    }
+  }
+
+  function filterOrders() {
+    const term = ohSearchInput.value.trim().toLowerCase();
+    const rows = orderHistoryBody.querySelectorAll('tr.oh-row');
+
+    if (rows.length === 0) {
+      // No orders at all - let toggleNoOrdersRow handle that message instead.
+      toggleNoSearchResultsRow(false);
+      return;
+    }
+
+    let anyVisible = false;
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    toggleNoSearchResultsRow(!anyVisible);
+  }
+
+  ohSearchInput.addEventListener('input', filterOrders);
+
+  // ---- Sort dropdown (defaults to Issue Date - Newest First) ----
+  const ohSortSelect = document.getElementById('oh-sort-select');
+
+  function sortOrderHistoryRows() {
+    const sortValue = ohSortSelect.value || 'issue_date_desc';
+    const rows = Array.from(orderHistoryBody.querySelectorAll('tr.oh-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'name_asc' || sortValue === 'name_desc') {
+        const nameA = (a.dataset.customer || '').toLowerCase();
+        const nameB = (b.dataset.customer || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortValue === 'name_asc' ? cmp : -cmp;
+      } else if (sortValue === 'due_date_asc' || sortValue === 'due_date_desc') {
+        const timeA = Date.parse(a.dataset.dueDate) || 0;
+        const timeB = Date.parse(b.dataset.dueDate) || 0;
+        return sortValue === 'due_date_asc' ? timeA - timeB : timeB - timeA;
+      } else {
+        const timeA = Date.parse(a.dataset.issueDate) || 0;
+        const timeB = Date.parse(b.dataset.issueDate) || 0;
+        return sortValue === 'issue_date_asc' ? timeA - timeB : timeB - timeA;
+      }
+    });
+
+    rows.forEach(row => orderHistoryBody.appendChild(row));
+  }
+
+  ohSortSelect.addEventListener('change', sortOrderHistoryRows);
+
+  // Apply the default sort (Issue Date - Newest First) as soon as the page loads
+  sortOrderHistoryRows();
+
+  orderHistoryBody.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+      // Don't open the modal when the remove button is clicked.
+      e.stopPropagation();
+      const orderId = removeBtn.dataset.orderId;
+      deleteOrder(orderId, removeBtn);
+      return;
+    }
+
+    const viewInfoBtn = e.target.closest('.view-info-btn');
+    if (viewInfoBtn) {
+      // Don't open the order details modal when View Info is clicked.
+      e.stopPropagation();
+      openTransferView(viewInfoBtn.dataset.orderId);
+      return;
+    }
+
+    const addTransferBtn = e.target.closest('.add-transfer-btn');
+    if (addTransferBtn) {
+      // Don't open the order details modal when Add Transfer Info is clicked.
+      e.stopPropagation();
+      openAddTransferModal(addTransferBtn.dataset.orderId, addTransferBtn);
+      return;
+    }
+
+    const row = e.target.closest('.oh-row');
+    if (row) {
+      openOrderModal(row.dataset.orderId);
+    }
+  });
+
+  function toggleNoOrdersRow() {
+    const hasRows = orderHistoryBody.querySelectorAll('tr.oh-row').length > 0;
+    let noOrdersRow = document.getElementById('no-orders-row');
+
+    if (!hasRows && !noOrdersRow) {
+      noOrdersRow = document.createElement('tr');
+      noOrdersRow.className = 'no-products-row';
+      noOrdersRow.id = 'no-orders-row';
+      noOrdersRow.innerHTML = '<td colspan="10">No orders found</td>';
+      orderHistoryBody.appendChild(noOrdersRow);
+    } else if (hasRows && noOrdersRow) {
+      noOrdersRow.remove();
+    }
+  }
+
+  function deleteOrder(orderId, removeBtn) {
+    if (!confirm('Remove this order? This cannot be undone.')) return;
+
+    removeBtn.disabled = true;
+
+    fetch('/delete_order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to delete order');
+        }
+
+        // Remove the row from the table
+        const row = orderHistoryBody.querySelector(`tr.oh-row[data-order-id="${orderId}"]`);
+        if (row) row.remove();
+
+        // Remove it from the local data too, in case the modal is reopened
+        const idx = ordersData.findIndex(o => String(o.oid) === String(orderId));
+        if (idx !== -1) ordersData.splice(idx, 1);
+
+        toggleNoOrdersRow();
+        filterOrders();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while removing the order.');
+        removeBtn.disabled = false;
+      });
+  }
+
+  document.getElementById('mmback-btn').addEventListener('click', () => {
+    window.location.href = '/';
+  });
+
+  document.getElementById('neworderBtn').addEventListener('click', () => {
+    window.location.href = '/new_order';
+  });
+</script>
+
+{% endblock %}

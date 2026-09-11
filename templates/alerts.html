@@ -1,0 +1,1067 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Alerts
+{% endblock %}
+
+{% block styles %}
+  <!-- Use nnorder.css for modal + table styling (same as recipes.html) -->
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Table styles (matching recipes.html) --- */
+
+    .alert-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .alert-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .alert-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .alert-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .alert-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .alert-table-wrapper tbody td:last-child {
+      text-align: right;
+    }
+    .alert-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .alert-table-wrapper .no-alerts-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .remove-btn {
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .remove-btn:hover {
+      background: #c82333;
+    }
+    .remove-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* --- Top bar (copied from recipes.html) --- */
+    .inv-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .inv-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .btn-add-new {
+      padding: 12px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+
+    .inv-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .inv-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .inv-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .inv-sort-wrap select:focus {
+      border-color: #111;
+    }
+
+    .inv-search-wrap {
+      position: relative;
+      flex: 0 1 320px;
+    }
+    .inv-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .inv-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .inv-search-wrap .inv-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* Override nnorder.css button primary color to black */
+    .btn-primary {
+      background: #111 !important;
+      color: #fff !important;
+      border: none !important;
+    }
+    .btn-primary:hover {
+      background: #333 !important;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #f2f2f2;
+      color: #444;
+    }
+
+    /* --- New Alert modal --- */
+    #newAlertModal .modal-box {
+      width: 420px;
+      max-width: 92vw;
+    }
+
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #444;
+      margin: 18px 0 8px;
+    }
+
+    /* --- Active/inactive switch (same styling family as recipes.html) --- */
+    .alert-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .alert-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .alert-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #ccc;
+      transition: background-color 0.15s ease;
+      border-radius: 24px;
+    }
+    .alert-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #fff;
+      transition: transform 0.15s ease;
+      border-radius: 50%;
+    }
+    .alert-switch input:checked + .alert-slider {
+      background-color: #0b1215;
+    }
+    .alert-switch input:checked + .alert-slider:before {
+      transform: translateX(20px);
+    }
+    .alert-switch input:disabled + .alert-slider {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .form-error {
+      color: #d33;
+      font-size: 12px;
+      margin-top: -8px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .form-error.show {
+      display: block;
+    }
+
+    /* --- Value input with currency suffix (New Alert form) --- */
+    .value-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .value-input-wrap input {
+      width: 100%;
+      box-sizing: border-box;
+      padding-right: 44px;
+    }
+    .value-input-suffix {
+      position: absolute;
+      right: 12px;
+      font-size: 13px;
+      color: #888;
+      pointer-events: none;
+      display: none;
+    }
+    .value-input-suffix.show {
+      display: inline;
+    }
+
+    /* --- Searchable product dropdown (same component as recipes.html) --- */
+    .product-select {
+      position: relative;
+      width: 100%;
+    }
+    .product-select-toggle {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 13px;
+      box-sizing: border-box;
+      background: #fff;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      color: #1c1c1c;
+    }
+    .product-select-toggle.placeholder {
+      color: #999;
+    }
+    .product-select-toggle::after {
+      content: '';
+      flex: 0 0 auto;
+      width: 8px;
+      height: 8px;
+      border-right: 1.5px solid #999;
+      border-bottom: 1.5px solid #999;
+      transform: rotate(45deg);
+      margin-top: -3px;
+    }
+    .product-select-toggle span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .product-select.open .product-select-toggle {
+      border-color: #111;
+    }
+    .product-select-panel {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+      z-index: 40;
+      overflow: hidden;
+    }
+    .product-select.open .product-select-panel {
+      display: block;
+    }
+    .product-select-search {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: none;
+      border-bottom: 1px solid #eee;
+      font-size: 13px;
+      outline: none;
+    }
+    .product-select-options {
+      max-height: 190px;
+      overflow-y: auto;
+    }
+    .product-select-option {
+      padding: 8px 10px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .product-select-option:hover,
+    .product-select-option.highlighted {
+      background: #f2f2f4;
+    }
+    .product-select-option.active {
+      font-weight: 600;
+      background: #eef2ff;
+    }
+    .product-select-empty {
+      padding: 10px;
+      font-size: 13px;
+      color: #999;
+      font-style: italic;
+    }
+
+    /* =======================================================
+       Page shell — matches the redesigned header/card pattern
+       used on the Home, Stock, Order History, Products,
+       Recipes, Execution History, Suppliers & Customers, and
+       Journal pages, built on top of layout.html's design
+       system.
+       ======================================================= */
+    .alr-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .alr-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .alr-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .alr-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing New Alert + sort + search */
+    .alr-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .alr-toolbar-card .inv-topbar {
+      margin-bottom: 0;
+    }
+    .alr-toolbar-card .inv-topbar h2 {
+      display: none; /* replaced by .alr-header h1 above */
+    }
+    .alr-toolbar-card .inv-topbar-actions {
+      margin-left: 0;
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .alr-toolbar-card .btn-add-new {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      background: #1c1c1c !important;
+      color: #fff !important;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .alr-toolbar-card .btn-add-new:hover {
+      background: #303030 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .alr-toolbar-card .btn-add-new svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .alr-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .alr-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .alr-toolbar-card .inv-topbar-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .alr-toolbar-card .btn-add-new {
+        width: 100%;
+        justify-content: center;
+      }
+      .alr-toolbar-card .inv-search-wrap input {
+        width: 100%;
+      }
+      .alr-toolbar-card,
+      .alr-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+{% set products = products | default([]) %}
+{% set alerts = alerts | default([]) %}
+
+<div class="alr-wrap">
+
+  <div class="alr-header">
+    <div>
+      <p class="greeting-eyebrow">Inventory</p>
+      <h1>Alerts</h1>
+    </div>
+  </div>
+
+  <div class="alr-toolbar-card">
+    <div class="inv-topbar">
+      <h2>Alerts</h2>
+      <div class="inv-topbar-actions">
+        <button class="btn-primary btn-add-new" id="openFormBtn" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+          New Alert
+        </button>
+        <div class="inv-sort-wrap">
+          <label for="inv-sort-select">Sort By</label>
+          <select id="inv-sort-select">
+            <option value="product_asc" selected>Product (A–Z)</option>
+            <option value="product_desc">Product (Z–A)</option>
+            <option value="status_asc">Status (A–Z)</option>
+            <option value="status_desc">Status (Z–A)</option>
+            <option value="active_first">Active First</option>
+            <option value="inactive_first">Inactive First</option>
+          </select>
+        </div>
+        <div class="inv-search-wrap">
+          <span class="inv-search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+            </svg>
+          </span>
+          <input type="text" id="inv-search-input" placeholder="Search alerts...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Alert Modal -->
+  <div class="modal-overlay" id="newAlertModal">
+    <div class="modal-box">
+      <h3>New Alert</h3>
+      <form id="alertForm" action="/add_alert" method="POST">
+
+        <div class="form-group">
+          <label for="alertTypeSelect">Alert Type</label>
+          <select id="alertTypeSelect" name="alert_type">
+            <option value="stock" selected>Stock</option>
+            <option value="price">Price</option>
+          </select>
+        </div>
+
+        <div class="section-label first">Alert When</div>
+
+        <div class="form-group">
+          <label for="alertProductSelect">Products</label>
+          <div id="alertProductSelectWrap"></div>
+        </div>
+
+        <div class="form-group" id="alertPriceTypeGroup" style="display: none;">
+          <label for="alertPriceTypeSelect">Price Type</label>
+          <select id="alertPriceTypeSelect" name="price_type">
+            <option value="price">Selling Price</option>
+            <option value="purchase_price">Purchase Price</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="alertSecondFieldLabel" id="alertSecondFieldLabel">Quantity</label>
+          <div class="value-input-wrap">
+            <input type="number" id="alertSecondField" name="value" min="0" step="0.01" required>
+            <span class="value-input-suffix" id="alertSecondFieldSuffix"></span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="alertNotifyWhenSelect">Notify When</label>
+          <select id="alertNotifyWhenSelect" name="notify_when">
+            <option value="decrease_from">Decrease From</option>
+            <option value="increase_from">Increase From</option>
+          </select>
+        </div>
+
+        <div class="section-label">Notify On</div>
+
+        <div class="form-group">
+          <label for="alertNotifyOnField">Notify On</label>
+          <input type="email" id="alertNotifyOnField" name="notify_on" value="{{ user_email | default('') }}" required>
+        </div>
+
+        <div class="form-error" id="alertFormError">Please select a product and fill in the required fields.</div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelNewAlertBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveNewAlertBtn" type="submit">Save alert</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="alr-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Alerts</h2>
+      <span class="section-sub">{{ alerts|length if alerts else 0 }} total</span>
+    </div>
+    <div class="alert-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Alert When</th>
+          <th>Alert On</th>
+          <th>Status</th>
+          <th>Actions</th>
+          <th></th> <!-- Remove column -->
+        </tr>
+      </thead>
+      <tbody id="alertsTableBody">
+        {% if alerts %}
+          {% for alert in alerts %}
+            <tr class="alert-row"
+                data-alert-id="{{ alert['id'] }}"
+                data-product="{{ alert['alert_on'] }}"
+                data-status="{{ alert['status'] }}">
+              <td class="alert-when">
+                {% if alert['alert_type'] == 'price' and alert['price_type'] %}
+                  {{ 'Purchase Price' if alert['price_type'] == 'purchase_price' else 'Selling Price' }} {{ alert['alert_when'] | currency(account.currency if account else 'USD') }}
+                {% else %}
+                  {{ alert['alert_when'] }}
+                {% endif %}
+              </td>
+              <td class="alert-on">{{ alert['alert_on'] }}</td>
+              <td class="alert-status"><span class="status-pill">{{ alert['status'] }}</span></td>
+              <td>
+                <label class="alert-switch">
+                  <input type="checkbox" class="alert-toggle" data-alert-id="{{ alert['id'] }}" {% if alert['active'] %}checked{% endif %}>
+                  <span class="alert-slider"></span>
+                </label>
+              </td>
+              <td>
+                <button type="button" class="remove-btn" data-alert-id="{{ alert['id'] }}">Remove</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-alerts-row" id="no-alerts-row">
+            <td colspan="5">No alerts available.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script>
+  // ---- Products available for alert creation ----
+  const PRODUCTS = {{ products | tojson }};
+
+  // Account's chosen currency (ISO code), for labeling the price-alert
+  // value input. Mirrors currency_filter.py - keep the two in sync.
+  const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
+  const CURRENCY_SYMBOLS = {
+    USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', CHF: 'CHF',
+    INR: '₹', KRW: '₩', VND: '₫', TRY: '₺', ILS: '₪', THB: '฿', PHP: '₱'
+  };
+  const currencyLabel = CURRENCY_SYMBOLS[accountCurrency] || accountCurrency;
+
+  // ================= New Alert Modal =================
+  const newModal = document.getElementById('newAlertModal');
+  const openNewBtn = document.getElementById('openFormBtn');
+  const cancelNewBtn = document.getElementById('cancelNewAlertBtn');
+  const alertForm = document.getElementById('alertForm');
+  const alertFormError = document.getElementById('alertFormError');
+
+  const alertTypeSelect = document.getElementById('alertTypeSelect');
+  const alertPriceTypeGroup = document.getElementById('alertPriceTypeGroup');
+  const alertPriceTypeSelect = document.getElementById('alertPriceTypeSelect');
+  const alertSecondFieldLabel = document.getElementById('alertSecondFieldLabel');
+  const alertSecondField = document.getElementById('alertSecondField');
+  const alertSecondFieldSuffix = document.getElementById('alertSecondFieldSuffix');
+  const alertNotifyWhenSelect = document.getElementById('alertNotifyWhenSelect');
+  const alertNotifyOnField = document.getElementById('alertNotifyOnField');
+
+  // ---- Close every open product dropdown (used on outside click / escape) ----
+  function closeAllProductSelects(except) {
+    document.querySelectorAll('.product-select.open').forEach(w => {
+      if (w !== except) w.classList.remove('open');
+    });
+  }
+  document.addEventListener('click', () => closeAllProductSelects());
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeAllProductSelects();
+  });
+
+  // ---- Build a searchable product dropdown: a hidden input (the actual value used on
+  // form submit) plus a text toggle + search box + filtered list ----
+  function buildProductSelect(inputId, inputName, selectedId) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'product-select';
+
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.id = inputId;
+    hiddenInput.name = inputName;
+    hiddenInput.value = selectedId || '';
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.type = 'button';
+    toggleBtn.className = 'product-select-toggle';
+
+    const toggleLabel = document.createElement('span');
+    toggleBtn.appendChild(toggleLabel);
+
+    function setToggleLabel(id) {
+      const p = id ? PRODUCTS.find(p => String(p.id) === String(id)) : null;
+      toggleLabel.textContent = p ? p.name : 'Select product';
+      toggleBtn.classList.toggle('placeholder', !p);
+    }
+    setToggleLabel(selectedId);
+
+    const panel = document.createElement('div');
+    panel.className = 'product-select-panel';
+
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.className = 'product-select-search';
+    searchInput.placeholder = 'Search products…';
+
+    const optionsList = document.createElement('div');
+    optionsList.className = 'product-select-options';
+
+    function renderOptions(filter) {
+      optionsList.innerHTML = '';
+      const q = (filter || '').trim().toLowerCase();
+      const matches = PRODUCTS.filter(p => !q || p.name.toLowerCase().includes(q));
+
+      if (matches.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'product-select-empty';
+        empty.textContent = 'No products found';
+        optionsList.appendChild(empty);
+        return;
+      }
+
+      matches.forEach(p => {
+        const opt = document.createElement('div');
+        opt.className = 'product-select-option';
+        if (String(hiddenInput.value) === String(p.id)) opt.classList.add('active');
+        opt.textContent = p.name;
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          hiddenInput.value = p.id;
+          setToggleLabel(p.id);
+          wrapper.classList.remove('open');
+          hiddenInput.dispatchEvent(new Event('change'));
+        });
+        optionsList.appendChild(opt);
+      });
+    }
+
+    toggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = wrapper.classList.contains('open');
+      closeAllProductSelects(wrapper);
+      if (!isOpen) {
+        wrapper.classList.add('open');
+        searchInput.value = '';
+        renderOptions('');
+        // Focus after the dropdown is visible so the caret lands in the search box
+        setTimeout(() => searchInput.focus(), 0);
+      } else {
+        wrapper.classList.remove('open');
+      }
+    });
+
+    searchInput.addEventListener('click', (e) => e.stopPropagation());
+    searchInput.addEventListener('input', () => renderOptions(searchInput.value));
+
+    panel.appendChild(searchInput);
+    panel.appendChild(optionsList);
+    wrapper.appendChild(hiddenInput);
+    wrapper.appendChild(toggleBtn);
+    wrapper.appendChild(panel);
+
+    wrapper.reset = () => {
+      hiddenInput.value = '';
+      setToggleLabel(null);
+    };
+
+    return wrapper;
+  }
+
+  // ---- Mount the product dropdown into its placeholder ----
+  const alertProductSelectWrap = document.getElementById('alertProductSelectWrap');
+  const productSelectWidget = buildProductSelect('alertProductSelect', 'product_id', null);
+  alertProductSelectWrap.appendChild(productSelectWidget);
+  const alertProductSelect = document.getElementById('alertProductSelect');
+
+  const STOCK_NOTIFY_OPTIONS = [
+    { value: 'decrease_from', label: 'Decrease From' },
+    { value: 'increase_from', label: 'Increase From' }
+  ];
+  const PRICE_NOTIFY_OPTIONS = [
+    { value: 'increase_from', label: 'Increase From' },
+    { value: 'decrease_from', label: 'Decrease From' },
+    { value: 'changes', label: 'Changes' }
+  ];
+
+  function populateNotifyOptions(options) {
+    alertNotifyWhenSelect.innerHTML = '';
+    options.forEach(opt => {
+      const el = document.createElement('option');
+      el.value = opt.value;
+      el.textContent = opt.label;
+      alertNotifyWhenSelect.appendChild(el);
+    });
+  }
+
+  function applyDefaultPriceValue() {
+    const pid = alertProductSelect.value;
+    if (!pid) return;
+    const p = PRODUCTS.find(p => String(p.id) === String(pid));
+    if (!p) return;
+    const val = alertPriceTypeSelect.value === 'purchase_price' ? p.purchase_price : p.price;
+    if (val !== undefined && val !== null) {
+      alertSecondField.value = val;
+    }
+  }
+
+  function updateFormForType() {
+    const type = alertTypeSelect.value;
+    if (type === 'stock') {
+      alertSecondFieldLabel.textContent = 'Quantity';
+      alertSecondField.value = '';
+      alertSecondField.step = '1';
+      populateNotifyOptions(STOCK_NOTIFY_OPTIONS);
+      alertPriceTypeGroup.style.display = 'none';
+      alertPriceTypeSelect.required = false;
+      alertSecondFieldSuffix.textContent = '';
+      alertSecondFieldSuffix.classList.remove('show');
+    } else {
+      alertSecondFieldLabel.textContent = 'Price';
+      alertSecondField.step = '0.01';
+      populateNotifyOptions(PRICE_NOTIFY_OPTIONS);
+      alertPriceTypeGroup.style.display = '';
+      alertPriceTypeSelect.required = true;
+      applyDefaultPriceValue();
+      alertSecondFieldSuffix.textContent = currencyLabel;
+      alertSecondFieldSuffix.classList.add('show');
+    }
+  }
+
+  alertTypeSelect.addEventListener('change', updateFormForType);
+  alertProductSelect.addEventListener('change', () => {
+    if (alertTypeSelect.value === 'price') {
+      applyDefaultPriceValue();
+    }
+  });
+  alertPriceTypeSelect.addEventListener('change', () => {
+    if (alertTypeSelect.value === 'price') {
+      applyDefaultPriceValue();
+    }
+  });
+
+  function resetNewAlertForm() {
+    alertForm.reset();
+    productSelectWidget.reset();
+    updateFormForType();
+    alertFormError.classList.remove('show');
+  }
+
+  openNewBtn.addEventListener('click', () => {
+    resetNewAlertForm();
+    newModal.classList.add('open');
+  });
+
+  cancelNewBtn.addEventListener('click', () => {
+    newModal.classList.remove('open');
+  });
+
+  newModal.addEventListener('click', (e) => {
+    if (e.target === newModal) newModal.classList.remove('open');
+  });
+
+  alertForm.addEventListener('submit', (e) => {
+    const productId = alertProductSelect.value;
+    const value = alertSecondField.value;
+    const notifyOn = alertNotifyOnField.value.trim();
+
+    if (!productId || value === '' || !notifyOn) {
+      e.preventDefault();
+      alertFormError.classList.add('show');
+      return;
+    }
+    alertFormError.classList.remove('show');
+  });
+
+  // ---- Table body events: toggle switch + remove button ----
+  const alertsTableBody = document.getElementById('alertsTableBody');
+
+  alertsTableBody.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+      deleteAlert(removeBtn);
+    }
+  });
+
+  alertsTableBody.addEventListener('change', (e) => {
+    const toggle = e.target.closest('.alert-toggle');
+    if (toggle) {
+      toggleAlert(toggle);
+    }
+  });
+
+  // ---- Toggle alert active/inactive ----
+  function toggleAlert(toggle) {
+    const alertId = toggle.dataset.alertId;
+    const active = toggle.checked;
+
+    toggle.disabled = true;
+
+    fetch('/toggle_alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alert_id: alertId, active })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to update alert');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (!data.success) {
+          alert('Error: ' + (data.message || 'Could not update alert.'));
+          toggle.checked = !active;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while updating the alert.');
+        toggle.checked = !active;
+      })
+      .finally(() => {
+        toggle.disabled = false;
+      });
+  }
+
+  // ---- Delete alert ----
+  function deleteAlert(removeBtn) {
+    const alertId = removeBtn.dataset.alertId;
+
+    if (!confirm('Remove this alert? This cannot be undone.')) return;
+
+    removeBtn.disabled = true;
+
+    fetch('/delete_alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alert_id: alertId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to delete alert');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          const row = alertsTableBody.querySelector(`tr[data-alert-id="${alertId}"]`);
+          if (row) row.remove();
+          toggleNoAlertsRow();
+        } else {
+          alert('Error: ' + (data.message || 'Could not delete alert.'));
+          removeBtn.disabled = false;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while removing the alert.');
+        removeBtn.disabled = false;
+      });
+  }
+
+  // ---- Toggle "no alerts" row ----
+  function toggleNoAlertsRow() {
+    const hasRows = alertsTableBody.querySelectorAll('tr.alert-row').length > 0;
+    let noRow = document.getElementById('no-alerts-row');
+
+    if (!hasRows && !noRow) {
+      noRow = document.createElement('tr');
+      noRow.className = 'no-alerts-row';
+      noRow.id = 'no-alerts-row';
+      noRow.innerHTML = '<td colspan="5">No alerts available.</td>';
+      alertsTableBody.appendChild(noRow);
+    } else if (hasRows && noRow) {
+      noRow.remove();
+    }
+  }
+
+  // ---- Search / filter ----
+  const searchInput = document.getElementById('inv-search-input');
+
+  function toggleNoSearchResultsRow(show) {
+    let row = document.getElementById('no-search-results-row');
+    if (show && !row) {
+      row = document.createElement('tr');
+      row.className = 'no-alerts-row';
+      row.id = 'no-search-results-row';
+      row.innerHTML = '<td colspan="5">No matching alerts found</td>';
+      alertsTableBody.appendChild(row);
+    } else if (!show && row) {
+      row.remove();
+    }
+  }
+
+  function filterAlerts() {
+    const term = searchInput.value.trim().toLowerCase();
+    const rows = alertsTableBody.querySelectorAll('tr.alert-row');
+
+    if (rows.length === 0) {
+      toggleNoSearchResultsRow(false);
+      return;
+    }
+
+    let anyVisible = false;
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    toggleNoSearchResultsRow(!anyVisible);
+  }
+
+  searchInput.addEventListener('input', filterAlerts);
+
+  // ---- Sort dropdown (defaults to Product A–Z) ----
+  const invSortSelect = document.getElementById('inv-sort-select');
+
+  function sortAlertRows() {
+    const sortValue = invSortSelect.value || 'product_asc';
+    const rows = Array.from(alertsTableBody.querySelectorAll('tr.alert-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'status_asc' || sortValue === 'status_desc') {
+        const statusA = (a.dataset.status || '').toLowerCase();
+        const statusB = (b.dataset.status || '').toLowerCase();
+        const cmp = statusA.localeCompare(statusB);
+        return sortValue === 'status_asc' ? cmp : -cmp;
+      } else if (sortValue === 'active_first' || sortValue === 'inactive_first') {
+        const activeA = a.querySelector('.alert-toggle').checked ? 1 : 0;
+        const activeB = b.querySelector('.alert-toggle').checked ? 1 : 0;
+        return sortValue === 'active_first' ? (activeB - activeA) : (activeA - activeB);
+      } else {
+        const productA = (a.dataset.product || '').toLowerCase();
+        const productB = (b.dataset.product || '').toLowerCase();
+        const cmp = productA.localeCompare(productB);
+        return sortValue === 'product_asc' ? cmp : -cmp;
+      }
+    });
+
+    rows.forEach(row => alertsTableBody.appendChild(row));
+  }
+
+  invSortSelect.addEventListener('change', sortAlertRows);
+
+  // Apply the default sort (Product A–Z) as soon as the page loads
+  sortAlertRows();
+
+  // Initialize the New Alert form fields for the default type
+  updateFormForType();
+</script>
+
+{% endblock %}

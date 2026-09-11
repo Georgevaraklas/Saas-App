@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="/static/favicon.ico" rel="icon">
+    <link href="/static/styles.css" rel="stylesheet">
+    {% block styles %}{% endblock %}
+    <style>
+      /* =======================================================
+         ACCOUNT CORNER — untouched, exactly as before
+         ======================================================= */
+      .account-logo-img {
+        max-width: 100%;
+        max-height: 100%;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        background: #f0f0f0;
+        border-radius: 50%;
+      }
+
+      /* Account dropdown */
+      .account-menu-wrap {
+        position: relative;
+        display: inline-block;
+      }
+      .account-dropdown {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 250px;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+        padding: 14px 0;
+        display: none;
+        z-index: 1000;
+      }
+      .account-dropdown.show {
+        display: block;
+      }
+      .account-dropdown-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 4px 18px 12px;
+      }
+      .account-dropdown-header .avatar-box {
+        flex: 0 0 auto;
+        width: 38px;
+        height: 38px;
+        border-radius: 8px;
+        background: #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        overflow: hidden;
+      }
+      .account-dropdown-header .avatar-box img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+      .account-dropdown-header .name {
+        font-weight: 700;
+        font-size: 15px;
+        line-height: 1.2;
+      }
+      .account-dropdown-header .company {
+        font-size: 12px;
+        color: #888;
+        margin-top: 2px;
+      }
+      .account-dropdown hr {
+        margin: 6px 0;
+        border: none;
+        border-top: 1px solid #eee;
+      }
+      .account-dropdown-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+      .account-dropdown-list li a,
+      .account-dropdown-list li button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 10px 18px;
+        color: #333;
+        text-decoration: none;
+        font-size: 14px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .account-dropdown-list li a:hover,
+      .account-dropdown-list li button:hover {
+        background: #f6f6f6;
+      }
+      .account-dropdown-list li.logout a,
+      .account-dropdown-list li.logout button {
+        color: #c0392b;
+      }
+    </style>
+
+    <style>
+      /* =======================================================
+         ΤΕΦΤΕΡΙ — boxed / rounded app shell (narrow sidebar)
+
+         NOTE ON THE FAINT-TEXT BUG: the previous version's nav
+         labels rendered almost invisible for every item except
+         "Home". That's the signature of an existing rule in this
+         project's own styles.css winning the cascade — most likely
+         a fade/opacity state meant to be toggled on by page JS that
+         this template doesn't call, or a low-contrast default color
+         on buttons/links that this file doesn't know about. Since
+         that stylesheet isn't visible here, every text- and
+         icon-bearing rule below is written at higher specificity
+         (chained to #sidebar) and pinned with `!important` on the
+         two properties most likely to be fought over: opacity and
+         color. If a page still looks faint after this, the
+         conflicting rule in styles.css needs to be found and
+         removed rather than patched around again.
+         ======================================================= */
+      *{ box-sizing: border-box; }
+
+      html, body{
+        margin: 0;
+        height: 100%;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+        color: #1c1c1c;
+        background: #F1F1F3;
+      }
+
+      @media (prefers-reduced-motion: reduce){
+        *{ transition: none !important; animation: none !important; }
+      }
+
+      a{ color: inherit; }
+
+      :focus-visible{
+        outline: 2px solid #1c1c1c;
+        outline-offset: 2px;
+      }
+
+      .layout{
+        display: flex;
+        align-items: stretch;
+        gap: 16px;
+        min-height: 100vh;
+        padding: 16px;
+      }
+
+      /* ---------------- SIDEBAR (its own card, narrower) ---------------- */
+      #sidebar.sidebar{
+        position: relative;
+        flex: 0 0 208px;
+        width: 208px;
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        padding: 20px 10px 16px;
+        z-index: 40;
+        opacity: 1 !important;
+      }
+
+      #sidebar .sidebar-head{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 0 6px 16px;
+        border-bottom: 1px solid #F0F0F1;
+        margin-bottom: 8px;
+      }
+
+      #sidebar .logo-wrap{
+        width: 56px;
+        height: 56px;
+        border-radius: 16px;
+        overflow: hidden;
+        background: #F1F1F3;
+        cursor: pointer;
+        display: block;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+      }
+      #sidebar .logo-wrap img{
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+      }
+
+      #sidebar .brand-title{
+        margin-top: 10px;
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        color: #1c1c1c !important;
+        background: transparent !important;
+        background-color: transparent !important;
+        opacity: 1 !important;
+        padding: 0 !important;
+      }
+
+      #sidebar .sidebar-scroll{
+        flex: 1 1 auto;
+        overflow-y: auto;
+        padding-top: 4px;
+      }
+
+      #sidebar .nav{
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      #sidebar .nav-group{
+        margin-bottom: 4px;
+      }
+      #sidebar .nav-group-label{
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #B4B4B8 !important;
+        opacity: 1 !important;
+        padding: 12px 10px 6px 10px;
+      }
+
+      #sidebar .nav .msbutton{
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+        border: none;
+        background: none;
+        cursor: pointer;
+        text-align: left;
+        padding: 7px 9px;
+        margin: 2px 0;
+        border-radius: 12px;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #6B6B70 !important;
+        opacity: 1 !important;
+        transition: background-color .12s ease, color .12s ease;
+      }
+      #sidebar .nav .msbutton span{
+        color: inherit !important;
+        opacity: 1 !important;
+      }
+
+      #sidebar .nav-icon-chip{
+        flex: 0 0 auto;
+        width: 27px;
+        height: 27px;
+        border-radius: 8px;
+        background: #F1F1F3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color .12s ease, color .12s ease;
+        opacity: 1 !important;
+      }
+      #sidebar .nav-icon-chip .nav-icon{
+        width: 15px;
+        height: 15px;
+        color: #6B6B70 !important;
+        stroke: currentColor !important;
+        opacity: 1 !important;
+      }
+
+      #sidebar .nav .msbutton:hover{
+        background: #F6F6F7;
+        color: #1c1c1c !important;
+      }
+      #sidebar .nav .msbutton:hover .nav-icon-chip{
+        background: #EDEDEF;
+      }
+
+      #sidebar .nav li.active .msbutton{
+        background: #F1F1F3;
+        color: #1c1c1c !important;
+      }
+      #sidebar .nav li.active .msbutton .nav-icon-chip{
+        background: #1c1c1c;
+      }
+      #sidebar .nav li.active .msbutton .nav-icon-chip .nav-icon{
+        color: #fff !important;
+      }
+
+      #sidebar .sidebar-foot{
+        border-top: 1px solid #F0F0F1;
+        padding-top: 8px;
+        margin-top: 8px;
+      }
+
+      /* ---------------- MAIN COLUMN ---------------- */
+      .main{
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      /* Topbar is its own rounded card */
+      .topbar{
+        flex: 0 0 auto;
+        min-height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 0 22px;
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+      }
+
+      .topbar-left{
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+      }
+
+      .sidebar-toggle{
+        display: none;
+        border: none;
+        background: #F1F1F3;
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex: 0 0 auto;
+        color: #333;
+      }
+      .sidebar-toggle svg{ width: 17px; height: 17px; }
+
+      #pageTitle{
+        font-size: 15px;
+        font-weight: 700;
+        color: #1c1c1c;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .sidebar-backdrop{
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.35);
+        z-index: 30;
+      }
+
+      /* Content is its own rounded card too, like a Preply panel */
+      .content{
+        flex: 1 1 auto;
+        background: #fff;
+        border-radius: 20px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+        padding: 28px 30px 36px;
+      }
+
+      .flash-stack{
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+      .flash-msg{
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .flash-error{
+        background: #fdecea;
+        color: #c0392b;
+      }
+      .flash-success{
+        background: #e6f6ea;
+        color: #1a7f37;
+      }
+      .flash-info{
+        background: #eef1ff;
+        color: #3547d1;
+      }
+
+      /* ---------------- RESPONSIVE ---------------- */
+      @media (max-width: 900px){
+        .layout{ padding: 0; gap: 0; }
+        #sidebar.sidebar{
+          position: fixed;
+          top: 12px; bottom: 12px; left: 12px;
+          transform: translateX(calc(-100% - 12px));
+          transition: transform .2s ease;
+        }
+        #sidebar.sidebar.open{
+          transform: translateX(0);
+          box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+        }
+        .sidebar-toggle{ display: inline-flex; }
+        body.sidebar-open .sidebar-backdrop{ display: block; }
+        .main{ gap: 0; }
+        .topbar{ border-radius: 0; padding: 0 16px; }
+        .content{ border-radius: 0; box-shadow: none; padding: 20px 16px 32px; }
+      }
+    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <title>ΤΕΦΤΕΡΙ: {% block title %}{% endblock %}</title>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <label class="logo-wrap" title="Πατήστε για αλλαγή λογότυπου">
+        <img id="logoImg" src="/static/logo.jpg" alt="logo">
+      </label>
+      <div class="brand-title">ΤΕΦΤΕΡΙ</div>
+    </div>
+
+    <div class="sidebar-scroll">
+      {% if session["user_id"] %}
+        <ul class="nav" id="navList">
+          <li><button class="msbutton" id="homeBtn" data-page="/">
+            <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 10 3l7 6.5"/><path d="M5 8v8h10V8"/></svg></span>
+            <span>Home</span>
+          </button></li>
+
+          <li class="nav-group">
+            <div class="nav-group-label">Inventory</div>
+            <ul class="nav" style="list-style:none;margin:0;padding:0;">
+              <li><button class="msbutton" id="stockBtn" data-page="/stock">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l7-3 7 3-7 3-7-3z"/><path d="M3 6v8l7 3 7-3V6"/><path d="M10 9v8"/></svg></span>
+                <span>Stock</span>
+              </button></li>
+              <li><button class="msbutton" id="pendingOrdersBtn" data-page="/pending_orders">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l3 2"/></svg></span>
+                <span>Pending Orders</span>
+              </button></li>
+              <li><button class="msbutton" id="ohBtn" data-page="/orderhistory">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h10v14l-2-1.2-2 1.2-2-1.2-2 1.2-2-1.2z"/><path d="M7 7h6M7 10h6M7 13h4"/></svg></span>
+                <span>Order History</span>
+              </button></li>
+              <li><button class="msbutton" id="productsBtn" data-page="/products">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3h5v5l-8 8-5-5 8-8z"/><circle cx="13.4" cy="6.6" r="1"/></svg></span>
+                <span>Products</span>
+              </button></li>
+            </ul>
+          </li>
+
+          <li class="nav-group">
+            <div class="nav-group-label">Production &amp; Invoicing</div>
+            <ul class="nav" style="list-style:none;margin:0;padding:0;">
+              <li><button class="msbutton" id="invoicesBtn" data-page="/invoices">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h6l3 3v13H6z"/><path d="M12 2v3h3"/><path d="M8 10h6M8 13h6M8 7h3"/></svg></span>
+                <span>Invoices</span>
+              </button></li>
+              <li><button class="msbutton" id="recipesBtn" data-page="/recipes">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h4"/><path d="M9 3v5l-5 8a1.5 1.5 0 0 0 1.3 2.3h9.4A1.5 1.5 0 0 0 16 16l-5-8V3"/></svg></span>
+                <span>Recipes</span>
+              </button></li>
+              <li><button class="msbutton" id="recipeHistoryBtn" data-page="/execution_history">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 8A6.4 6.4 0 1 1 6 13.4"/><path d="M4 4v4h4"/><path d="M10 7v4l3 2"/></svg></span>
+                <span>Recipe History</span>
+              </button></li>
+            </ul>
+          </li>
+
+          <li class="nav-group">
+            <div class="nav-group-label">Business</div>
+            <ul class="nav" style="list-style:none;margin:0;padding:0;">
+              <li><button class="msbutton" id="scBtn" data-page="/suppliers_customers">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7" r="2.5"/><path d="M2.5 16c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5"/><circle cx="14.5" cy="7.5" r="2"/><path d="M13 11.7c1.9.3 3.5 1.7 3.5 4.3"/></svg></span>
+                <span>Contacts</span>
+              </button></li>
+              <li><button class="msbutton" id="reportsBtn" data-page="/reports">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16V9"/><path d="M9.5 16V4"/><path d="M15 16V9"/><path d="M2.5 17h15"/></svg></span>
+                <span>Reports</span>
+              </button></li>
+              <li><button class="msbutton" id="journalBtn" data-page="/journal">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.6C4 3 4.6 3 5 3h5v13H5c-.4 0-1 .2-1 1V3.6z"/><path d="M10 3h5c.5 0 1 0 1 .5V17c0-.7-.6-1-1-1h-5"/></svg></span>
+                <span>Journal</span>
+              </button></li>
+              <li><button class="msbutton" id="alertsBtn" data-page="/alerts">
+                <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3.5a4.5 4.5 0 0 0-4.5 4.5v2.3L4 13.5h12l-1.5-3.2V8A4.5 4.5 0 0 0 10 3.5z"/><path d="M8.3 16a1.8 1.8 0 0 0 3.4 0"/></svg></span>
+                <span>Alerts</span>
+              </button></li>
+            </ul>
+          </li>
+        </ul>
+
+        <div class="sidebar-foot">
+          <ul class="nav" style="list-style:none;margin:0;padding:0;">
+            <li><button class="msbutton" id="settingsBtn" data-page="/settings/personal-details">
+              <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="2.6"/><path d="M10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2M15.1 4.9l-1.4 1.4M6.3 13.7l-1.4 1.4M15.1 15.1l-1.4-1.4M6.3 6.3 4.9 4.9"/></svg></span>
+              <span>Settings</span>
+            </button></li>
+          </ul>
+        </div>
+      {% else %}
+        <ul class="nav" id="navList">
+          <li><button class="msbutton" id="homeBtn" data-page="/">
+            <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 10 3l7 6.5"/><path d="M5 8v8h10V8"/></svg></span>
+            <span>Home</span>
+          </button></li>
+          <li><button class="msbutton" id="loginBtn" data-page="/login">
+            <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H4v14h4"/><path d="M13 6l4 4-4 4"/><path d="M17 10H8"/></svg></span>
+            <span>Log In</span>
+          </button></li>
+          <li><button class="msbutton" id="registerBtn" data-page="/register">
+            <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="7" r="3"/><path d="M2.5 16.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M15 7h3M16.5 5.5v3"/></svg></span>
+            <span>Register</span>
+          </button></li>
+        </ul>
+      {% endif %}
+    </div>
+  </aside>
+
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle" id="sidebarToggle" aria-label="Άνοιγμα μενού" aria-expanded="false">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
+        </button>
+        <div id="pageTitle"></div>
+      </div>
+
+      {% if session["user_id"] %}
+        <div class="account-menu-wrap" id="accountMenuWrap">
+          <button class="account-btn" id="accountBtn" title="Στοιχεία λογαριασμού"
+                  data-company="{{ account.name if account else '' }}"
+                  data-fullname="{{ account.fullname if account else '' }}">
+            <span class="account-text">
+              <div class="account-name"><strong>{{ account.name if account else '' }}</strong></div>
+              <div class="account-id">{{ account.fullname if account else '' }}</div>
+            </span>
+            <span class="avatar">
+              {% if account and account.logo %}
+                <img id="accountLogoImg" class="account-logo-img" src="{{ url_for('uploaded_logo', filename=account.logo) }}" alt="logo">
+              {% else %}
+                &#128100;
+              {% endif %}
+            </span>
+          </button>
+
+          <div class="account-dropdown" id="accountDropdown">
+            <div class="account-dropdown-header">
+              <span class="avatar-box">
+                {% if account and account.logo %}
+                  <img src="{{ url_for('uploaded_logo', filename=account.logo) }}" alt="logo">
+                {% else %}
+                  &#128100;
+                {% endif %}
+              </span>
+              <div>
+                <div class="name">{{ account.fullname if account else '' }}</div>
+                <div class="company">{{ account.name if account else '' }}</div>
+              </div>
+            </div>
+            <hr>
+            <ul class="account-dropdown-list">
+              <li><a href="/">Home</a></li>
+              <li><a href="/settings/personal-details">Settings</a></li>
+              <li><a href="/help">Help</a></li>
+            </ul>
+            <hr>
+            <ul class="account-dropdown-list">
+              <li class="logout">
+                <form action="/logout" method="post" style="margin:0;">
+                  <button type="submit">Log out</button>
+                </form>
+              </li>
+            </ul>
+          </div>
+        </div>
+      {% else %}
+        <button class="msbutton" id="loginBtn" style="width:auto;color:#1c1c1c;padding:8px 14px;">   Log In   </button>
+      {% endif %}
+    </div>
+
+    <div class="content">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-stack">
+            {% for category, message in messages %}
+              <div class="flash-msg flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
+      {% block main %}
+      {% endblock %}
+    </div>
+  </div>
+</div>
+
+<script>
+  // Sidebar navigation (click handler)
+  const navList = document.getElementById('navList');
+  const pageTitle = document.getElementById('pageTitle');
+  const announcementText = document.getElementById('announcementText');
+
+  navList.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    // Remove active from all items
+    navList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+    // Add active to the clicked item's parent li
+    btn.closest('li').classList.add('active');
+    // Update page title etc. (if they exist)
+    const page = btn.dataset.page;
+    if (pageTitle) pageTitle.textContent = btn.querySelector('span:last-child') ? btn.querySelector('span:last-child').textContent : page;
+    if (announcementText) announcementText.textContent = 'Δεν υπάρχουν ανακοινώσεις.';
+    // Remember which button was clicked so it stays highlighted after
+    // the full page navigation below reloads the page.
+    if (page) {
+      sessionStorage.setItem('sidebarClickedPage', page);
+    }
+  });
+
+  // Account button -> dropdown menu
+  const accountBtnEl = document.getElementById('accountBtn');
+  const accountDropdownEl = document.getElementById('accountDropdown');
+  if (accountBtnEl && accountDropdownEl) {
+    accountBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      accountDropdownEl.classList.toggle('show');
+    });
+    // Close when clicking outside the menu
+    document.addEventListener('click', (e) => {
+      if (!accountDropdownEl.contains(e.target) && e.target !== accountBtnEl) {
+        accountDropdownEl.classList.remove('show');
+      }
+    });
+    // Close on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') accountDropdownEl.classList.remove('show');
+    });
+  }
+
+  // Redirect buttons (using data-page to avoid duplicated listeners)
+  // We can handle all redirects in one listener using data-page
+  navList.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    // If it's one of the navigation buttons (except maybe login/register which also have data-page)
+    // We'll use the data-page attribute to redirect
+    const page = btn.dataset.page;
+    if (page) {
+      // But we must not redirect for the login/register if they are already on that page?
+      // Actually we just redirect. But careful: the loginBtn in the topbar also exists,
+      // but it's separate. We'll only handle sidebar buttons.
+      // So we can add a check: if the button is inside the navList
+      if (navList.contains(btn)) {
+        window.location.href = page;
+      }
+    }
+  });
+
+  // ---- Highlight on page load ----
+  // Highlighting should only reflect an actual click on a sidebar button.
+  // A sidebar click stores its target page in sessionStorage right before
+  // navigating away. If this page load matches that stored target, we know
+  // we got here via that click, so we highlight the matching button.
+  // Otherwise (typed URL, refresh, external link, etc.) we default to Home.
+  document.addEventListener('DOMContentLoaded', function() {
+    let currentPath = window.location.pathname;
+    if (currentPath.length > 1 && currentPath.endsWith('/')) {
+      currentPath = currentPath.slice(0, -1);
+    }
+    currentPath = currentPath.split('?')[0];
+
+    const clickedPage = sessionStorage.getItem('sidebarClickedPage');
+    // Consume it immediately so it only ever applies to the single page load
+    // that follows the click, not to later refreshes of the same page.
+    sessionStorage.removeItem('sidebarClickedPage');
+
+    let matchedBtn = null;
+    if (clickedPage) {
+      let normalizedClicked = clickedPage;
+      if (normalizedClicked.length > 1 && normalizedClicked.endsWith('/')) {
+        normalizedClicked = normalizedClicked.slice(0, -1);
+      }
+      if (normalizedClicked === currentPath) {
+        matchedBtn = navList.querySelector(`button[data-page="${clickedPage}"]`);
+      }
+    }
+
+    navList.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+
+    if (matchedBtn) {
+      matchedBtn.closest('li').classList.add('active');
+    } else {
+      const homeBtn = document.getElementById('homeBtn');
+      if (homeBtn) homeBtn.closest('li').classList.add('active');
+    }
+
+    if (pageTitle) {
+      const activeBtn = navList.querySelector('li.active .msbutton');
+      if (activeBtn) {
+        const span = activeBtn.querySelector('span:last-child');
+        pageTitle.textContent = span ? span.textContent : '';
+      }
+    }
+  });
+
+  // ---- Mobile sidebar toggle ----
+  const sidebarEl = document.getElementById('sidebar');
+  const sidebarToggleEl = document.getElementById('sidebarToggle');
+  const sidebarBackdropEl = document.getElementById('sidebarBackdrop');
+
+  function closeSidebar() {
+    sidebarEl.classList.remove('open');
+    document.body.classList.remove('sidebar-open');
+    if (sidebarToggleEl) sidebarToggleEl.setAttribute('aria-expanded', 'false');
+  }
+  function openSidebar() {
+    sidebarEl.classList.add('open');
+    document.body.classList.add('sidebar-open');
+    if (sidebarToggleEl) sidebarToggleEl.setAttribute('aria-expanded', 'true');
+  }
+  if (sidebarToggleEl) {
+    sidebarToggleEl.addEventListener('click', () => {
+      sidebarEl.classList.contains('open') ? closeSidebar() : openSidebar();
+    });
+  }
+  if (sidebarBackdropEl) {
+    sidebarBackdropEl.addEventListener('click', closeSidebar);
+  }
+  // Close the mobile sidebar after choosing a page
+  navList.addEventListener('click', (e) => {
+    if (e.target.closest('button')) closeSidebar();
+  });
+</script>
+
+</body>
+</html>

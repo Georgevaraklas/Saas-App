@@ -1,0 +1,1330 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Products
+{% endblock %}
+
+{% block styles %}
+  <!-- Use nnorder.css for modal styling (same as new_order) -->
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Table styles (matching suppliers_customers.html) --- */
+
+    .product-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .product-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .product-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .product-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .product-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    /* Push the Remove button to the right edge of the column */
+    .product-table-wrapper tbody td:last-child {
+      text-align: right;
+    }
+    .product-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .product-table-wrapper tbody tr:hover {
+      background: #fafafa;
+    }
+    /* Make rows clickable (pointer cursor) */
+    .product-table-wrapper tbody tr.product-row {
+      cursor: pointer;
+    }
+    .product-table-wrapper tbody tr.product-row:hover {
+      background: #f5f5f5;
+    }
+    .product-table-wrapper .no-products-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .remove-btn {
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .remove-btn:hover {
+      background: #c82333;
+    }
+    .remove-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Delete confirmation modal */
+    .delete-confirm-message {
+      font-size: 14px;
+      color: #444;
+      line-height: 1.5;
+      margin: 4px 0 20px;
+    }
+    .btn-danger {
+      background: #dc3545 !important;
+      color: #fff !important;
+      border: none !important;
+    }
+    .btn-danger:hover {
+      background: #c82333 !important;
+    }
+    .btn-danger:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* --- Top bar (copied from invoices.html) --- */
+    .inv-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .inv-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .btn-add-new {
+      padding: 12px 26px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 8px;
+    }
+
+    .inv-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .inv-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .inv-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .inv-sort-wrap select:focus {
+      border-color: #111;
+    }
+
+    .inv-search-wrap {
+      position: relative;
+      flex: 0 1 320px;
+    }
+    .inv-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .inv-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .inv-search-wrap .inv-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* Override nnorder.css button primary color to black */
+    .btn-primary {
+      background: #111 !important;
+      color: #fff !important;
+      border: none !important;
+    }
+    .btn-primary:hover {
+      background: #333 !important;
+    }
+
+    /* =======================================================
+       Page shell — matches the redesigned header/card pattern
+       used on the Home, Stock, and Order History pages, built
+       on top of layout.html's design system.
+       ======================================================= */
+    .prod-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .prod-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .prod-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .prod-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing New Product + sort + search */
+    .prod-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .prod-toolbar-card .inv-topbar {
+      margin-bottom: 0;
+    }
+    .prod-toolbar-card .inv-topbar h2 {
+      display: none; /* replaced by .prod-header h1 above */
+    }
+    .prod-toolbar-card .inv-topbar-actions {
+      margin-left: 0;
+      width: 100%;
+      justify-content: space-between;
+    }
+
+    .prod-toolbar-card .btn-add-new {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      background: #1c1c1c !important;
+      color: #fff !important;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .prod-toolbar-card .btn-add-new:hover {
+      background: #303030 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .prod-toolbar-card .btn-add-new svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .prod-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .prod-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .prod-toolbar-card .inv-topbar-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .prod-toolbar-card .btn-add-new {
+        width: 100%;
+        justify-content: center;
+      }
+      .prod-toolbar-card .inv-search-wrap input {
+        width: 100%;
+      }
+      .prod-toolbar-card,
+      .prod-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+
+    /* --- Codes/Picture column button --- */
+    .product-table-wrapper tbody td.product-codes-cell {
+      text-align: center;
+      width: 1%;
+      white-space: nowrap;
+    }
+    .codes-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      color: #1c1c1c;
+      cursor: pointer;
+      transition: background-color .12s ease, border-color .12s ease, transform .12s ease;
+    }
+    .codes-btn:hover {
+      background: #f5f5f5;
+      border-color: #ccc;
+    }
+    .codes-btn:active {
+      transform: translateY(1px);
+    }
+    .codes-btn svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      pointer-events: none;
+    }
+
+    /* --- Product Codes & Picture modal --- */
+    .product-codes-modal {
+      max-width: 480px;
+    }
+    .product-codes-subtitle {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+      margin: -6px 0 18px;
+    }
+    .codes-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+    .code-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .code-slot-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+    }
+    .code-slot-box {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #fafafa;
+      border: 1px solid #eee;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .code-slot-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #fff;
+    }
+    .code-slot-add {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border: 2px dashed #ddd;
+      border-radius: 12px;
+      color: #b5b5b5;
+      cursor: pointer;
+      transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .code-slot-add:hover {
+      background: #f5f5f5;
+      border-color: #bbb;
+      color: #777;
+    }
+    .code-slot-add svg {
+      width: 26px;
+      height: 26px;
+    }
+    .code-slot-box .code-slot-replace {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.65);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+    }
+    .code-slot-box .code-slot-replace svg {
+      width: 13px;
+      height: 13px;
+    }
+    .code-slot-box .code-slot-remove {
+      position: absolute;
+      bottom: 4px;
+      left: 4px;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(220,53,69,0.85);
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color .12s ease;
+    }
+    .code-slot-box .code-slot-remove:hover {
+      background: rgba(200,35,51,0.95);
+    }
+    .code-slot-box .code-slot-remove svg {
+      width: 13px;
+      height: 13px;
+    }
+    .code-slot-box .code-slot-remove:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .code-slot-status {
+      font-size: 12px;
+      font-weight: 600;
+      color: #9A9AA0;
+    }
+    @media (max-width: 480px) {
+      .codes-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="prod-wrap">
+
+  <div class="prod-header">
+    <div>
+      <p class="greeting-eyebrow">Inventory</p>
+      <h1>Products</h1>
+    </div>
+  </div>
+
+  <div class="prod-toolbar-card">
+    <div class="inv-topbar">
+      <h2>Products</h2>
+      <div class="inv-topbar-actions">
+        <button class="btn-primary btn-add-new" id="openFormBtn" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+          New Product
+        </button>
+        <div class="inv-sort-wrap">
+          <label for="inv-sort-select">Sort By</label>
+          <select id="inv-sort-select">
+            <option value="name_asc" selected>Product Name (A–Z)</option>
+            <option value="name_desc">Product Name (Z–A)</option>
+            <option value="price_desc">Selling Price (High to Low)</option>
+            <option value="price_asc">Selling Price (Low to High)</option>
+            <option value="tax_desc">Tax (High to Low)</option>
+            <option value="tax_asc">Tax (Low to High)</option>
+          </select>
+        </div>
+        <div class="inv-search-wrap">
+          <span class="inv-search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+            </svg>
+          </span>
+          <input type="text" id="inv-search-input" placeholder="Search products...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Product Modal -->
+  <div class="modal-overlay" id="newProductModal">
+    <div class="modal-box">
+      <h3>New Product</h3>
+      <form id="productForm" action="/add_product" method="POST">
+        <div class="form-group">
+          <label for="productName">Name</label>
+          <input type="text" id="productName" placeholder="Product Name" name="name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="productSku">SKU</label>
+          <input type="text" id="productSku" placeholder="Product SKU" name="sku">
+        </div>
+
+        <div class="form-group">
+          <label for="productPrice">Selling Price</label>
+          <input type="number" id="productPrice" placeholder="Selling Price" step="0.01" min="0" name="price" required>
+        </div>
+
+        <div class="form-group">
+          <label for="productPurchasePrice">Purchase Price</label>
+          <input type="number" id="productPurchasePrice" placeholder="Purchase Price" step="0.01" min="0" name="purchase_price">
+        </div>
+
+        <div class="form-group">
+          <label for="productTax">Tax (Optional)</label>
+          <input type="number" id="productTax" placeholder="%" step="0.01" min="0" name="tax">
+        </div>
+
+        <div class="form-group">
+          <label for="productUom">Unit of Measurement</label>
+          <select id="productUom" name="uom" required>
+            <option value="" disabled selected>Select unit</option>
+            <option value="pcs">Pieces (pcs)</option>
+            <option value="box">Box</option>
+            <option value="pack">Pack</option>
+            <option value="dozen">Dozen</option>
+            <option value="pair">Pair</option>
+            <option value="kg">Kilograms (kg)</option>
+            <option value="g">Grams (g)</option>
+            <option value="lb">Pounds (lb)</option>
+            <option value="oz">Ounces (oz)</option>
+            <option value="l">Liters (l)</option>
+            <option value="ml">Milliliters (ml)</option>
+            <option value="gal">Gallons (gal)</option>
+            <option value="fl_oz">Fluid Ounces (fl oz)</option>
+            <option value="m">Meters (m)</option>
+            <option value="km">Kilometers (km)</option>
+            <option value="sqm">Square Meters (m&sup2;)</option>
+            <option value="sqkm">Square Kilometers (km&sup2;)</option>
+            <option value="cm">Centimeters (cm)</option>
+            <option value="mm">Millimeters (mm)</option>
+            <option value="ft">Feet (ft)</option>
+            <option value="in">Inches (in)</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelNewBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveNewBtn" type="submit">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Edit Product Modal -->
+  <div class="modal-overlay" id="editProductModal">
+    <div class="modal-box">
+      <h3>Edit Product</h3>
+      <form id="editProductForm">
+        <input type="hidden" id="editProductId">
+        <div class="form-group">
+          <label for="editProductName">Name</label>
+          <input type="text" id="editProductName" placeholder="Product Name" required>
+        </div>
+
+        <div class="form-group">
+          <label for="editProductSku">SKU</label>
+          <input type="text" id="editProductSku" placeholder="Product SKU">
+        </div>
+
+        <div class="form-group">
+          <label for="editProductPrice">Selling Price</label>
+          <input type="number" id="editProductPrice" placeholder="Selling Price" step="0.01" min="0" required>
+        </div>
+
+        <div class="form-group">
+          <label for="editProductPurchasePrice">Purchase Price</label>
+          <input type="number" id="editProductPurchasePrice" placeholder="Purchase Price" step="0.01" min="0">
+        </div>
+
+        <div class="form-group">
+          <label for="editProductTax">Tax (Optional)</label>
+          <input type="number" id="editProductTax" placeholder="%" step="0.01" min="0">
+        </div>
+
+        <div class="form-group">
+          <label for="editProductUom">Unit of Measurement</label>
+          <select id="editProductUom" required>
+            <option value="" disabled>Select unit</option>
+            <option value="pcs">Pieces (pcs)</option>
+            <option value="box">Box</option>
+            <option value="pack">Pack</option>
+            <option value="dozen">Dozen</option>
+            <option value="pair">Pair</option>
+            <option value="kg">Kilograms (kg)</option>
+            <option value="g">Grams (g)</option>
+            <option value="lb">Pounds (lb)</option>
+            <option value="oz">Ounces (oz)</option>
+            <option value="l">Liters (l)</option>
+            <option value="ml">Milliliters (ml)</option>
+            <option value="gal">Gallons (gal)</option>
+            <option value="fl_oz">Fluid Ounces (fl oz)</option>
+            <option value="m">Meters (m)</option>
+            <option value="km">Kilometers (km)</option>
+            <option value="sqm">Square Meters (m&sup2;)</option>
+            <option value="sqkm">Square Kilometers (km&sup2;)</option>
+            <option value="cm">Centimeters (cm)</option>
+            <option value="mm">Millimeters (mm)</option>
+            <option value="ft">Feet (ft)</option>
+            <option value="in">Inches (in)</option>
+          </select>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="cancelEditBtn" type="button">Cancel</button>
+          <button class="btn-primary" id="saveEditBtn" type="button">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal (used when a product is linked to a recipe) -->
+  <div class="modal-overlay" id="deleteConfirmModal">
+    <div class="modal-box">
+      <h3>Confirm Deletion</h3>
+      <p class="delete-confirm-message" id="deleteConfirmMessage"></p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="cancelDeleteBtn" type="button">Cancel</button>
+        <button class="btn-primary btn-danger" id="confirmDeleteBtn" type="button">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product Codes & Picture Modal -->
+  <div class="modal-overlay" id="productCodesModal">
+    <div class="modal-box product-codes-modal">
+      <h3>Codes & Picture</h3>
+      <p class="product-codes-subtitle" id="productCodesSubtitle"></p>
+
+      <div class="codes-grid">
+        <div class="code-slot">
+          <span class="code-slot-label">Barcode</span>
+          <div class="code-slot-box" id="barcodeBox" data-field="barcode"></div>
+        </div>
+        <div class="code-slot">
+          <span class="code-slot-label">QR Code</span>
+          <div class="code-slot-box" id="qrcodeBox" data-field="qrcode"></div>
+        </div>
+        <div class="code-slot">
+          <span class="code-slot-label">Picture</span>
+          <div class="code-slot-box" id="pictureBox" data-field="picture"></div>
+        </div>
+      </div>
+
+      <!-- Hidden file input reused for whichever slot triggers an upload -->
+      <input type="file" id="codesFileInput" accept="image/*" style="display:none;">
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="closeCodesBtn" type="button">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="prod-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Products</h2>
+      <span class="section-sub">{{ row|length if row else 0 }} total</span>
+    </div>
+    <div class="product-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>SKU</th>
+          <th>Selling Price</th>
+          <th>Purchase Price</th>
+          <th>Tax</th>
+          <th>UoM</th>
+          <th></th> <!-- Codes & Picture column -->
+          <th></th> <!-- Remove column -->
+        </tr>
+      </thead>
+      <tbody id="productsTableBody">
+        {% if row %}
+          {% for product in row %}
+            <tr class="product-row" data-product-id="{{ product['id'] if product['id'] is defined else loop.index0 }}" data-name="{{ product['name'] }}" data-price="{{ product['price'] }}" data-purchase-price="{{ product['purchase_price'] if product['purchase_price'] is not none and product['purchase_price'] != '' else '' }}" data-tax="{{ product['tax'] if product['tax'] is not none and product['tax'] != '' else '' }}" data-barcode="{{ url_for('static', filename='uploads/products/' + product['barcode']) if product['barcode'] is defined and product['barcode'] else '' }}" data-qrcode="{{ url_for('static', filename='uploads/products/' + product['qr_code']) if product['qr_code'] is defined and product['qr_code'] else '' }}" data-picture="{{ url_for('static', filename='uploads/products/' + product['picture']) if product['picture'] is defined and product['picture'] else '' }}">
+              <td class="product-name">{{ product["name"] }}</td>
+              <td class="product-sku">{{ product["sku"] if product["sku"] is not none and product["sku"] != '' else '-' }}</td>
+              <td class="product-price">{{ product["price"] | currency(account.currency if account else 'USD') }}</td>
+              <td class="product-purchase-price">
+                {% if product["purchase_price"] is not none and product["purchase_price"] != '' %}
+                  {{ product["purchase_price"] | currency(account.currency if account else 'USD') }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td class="product-tax">
+                {% if product["tax"] is not none and product["tax"] != '' %}
+                  {{ product["tax"] }}%
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td class="product-uom">{{ product["uom"] }}</td>
+              <td class="product-codes-cell">
+                <button type="button" class="codes-btn" data-product-id="{{ product['id'] if product['id'] is defined else loop.index0 }}" title="View barcode, QR code & picture" aria-label="View barcode, QR code & picture">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="14" height="12" rx="1.5"/>
+                    <path d="M6 4v12M9 4v12M11.5 4v12M14 4v12"/>
+                  </svg>
+                </button>
+              </td>
+              <td>
+                <button type="button" class="remove-btn" data-product-id="{{ product['id'] if product['id'] is defined else loop.index0 }}">Remove</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-products-row" id="no-products-row">
+            <td colspan="8">No products available.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script>
+  // Account's chosen currency (ISO code), passed from the server.
+  // Falls back to USD if the account/currency isn't set for any reason.
+  const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
+
+  // Mirrors the symbol set in currency_filter.py - keep the two in sync.
+  // Only currencies with a widely-recognized, unambiguous symbol are
+  // listed; everything else falls back to its 3-letter ISO code.
+  const CURRENCY_SYMBOLS = {
+    USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', CHF: 'CHF',
+    INR: '₹', KRW: '₩', VND: '₫', TRY: '₺', ILS: '₪', THB: '฿', PHP: '₱'
+  };
+
+  // ---- New Product Modal ----
+  const newModal = document.getElementById('newProductModal');
+  const openNewBtn = document.getElementById('openFormBtn');
+  const cancelNewBtn = document.getElementById('cancelNewBtn');
+  const productForm = document.getElementById('productForm');
+
+  openNewBtn.addEventListener('click', () => {
+    newModal.classList.add('open');
+    document.getElementById('productName').focus();
+  });
+
+  cancelNewBtn.addEventListener('click', () => {
+    newModal.classList.remove('open');
+  });
+
+  newModal.addEventListener('click', (e) => {
+    if (e.target === newModal) newModal.classList.remove('open');
+  });
+
+  // ---- Edit Product Modal ----
+  const editModal = document.getElementById('editProductModal');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const saveEditBtn = document.getElementById('saveEditBtn');
+  const editId = document.getElementById('editProductId');
+  const editName = document.getElementById('editProductName');
+  const editSku = document.getElementById('editProductSku');
+  const editPrice = document.getElementById('editProductPrice');
+  const editPurchasePrice = document.getElementById('editProductPurchasePrice');
+  const editTax = document.getElementById('editProductTax');
+  const editUom = document.getElementById('editProductUom');
+
+  // Store current row reference for update
+  let currentEditRow = null;
+
+  function openEditModal(row) {
+    const productId = row.dataset.productId;
+    const name = row.querySelector('.product-name').textContent.trim();
+    const skuText = row.querySelector('.product-sku').textContent.trim();
+    // skuText is either the SKU value or "-" when unset
+    const sku = skuText === '-' ? '' : skuText;
+    const priceText = row.querySelector('.product-price').textContent.trim();
+    // price is formatted like "$12.34" – extract number
+    const price = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+    const purchasePriceText = row.querySelector('.product-purchase-price').textContent.trim();
+    // purchasePriceText is either the formatted price value or "-" when unset
+    let purchasePrice = null;
+    if (purchasePriceText !== '-') {
+      purchasePrice = parseFloat(purchasePriceText.replace(/[^0-9.]/g, ''));
+    }
+    const taxText = row.querySelector('.product-tax').textContent.trim();
+    // taxText is either "10%" or "-"
+    let tax = null;
+    if (taxText !== '-') {
+      tax = parseFloat(taxText.slice(0, -1)); // remove trailing %
+    }
+    const uom = row.querySelector('.product-uom').textContent.trim();
+
+    editId.value = productId;
+    editName.value = name;
+    editSku.value = sku;
+    editPrice.value = isNaN(price) ? '' : price;
+    editPurchasePrice.value = (purchasePrice !== null && !isNaN(purchasePrice)) ? purchasePrice : '';
+    editTax.value = tax !== null && !isNaN(tax) ? tax : '';
+    editUom.value = uom;
+
+    currentEditRow = row;
+    editModal.classList.add('open');
+    editName.focus();
+  }
+
+  function closeEditModal() {
+    editModal.classList.remove('open');
+    currentEditRow = null;
+  }
+
+  cancelEditBtn.addEventListener('click', closeEditModal);
+  editModal.addEventListener('click', (e) => {
+    if (e.target === editModal) closeEditModal();
+  });
+
+  // ---- Save Edit (AJAX) ----
+  saveEditBtn.addEventListener('click', async () => {
+    const productId = editId.value;
+    const name = editName.value.trim();
+    const sku = editSku.value.trim();
+    const price = parseFloat(editPrice.value);
+    // If purchase price field is empty or whitespace, send null; otherwise parse float
+    const purchasePriceRaw = editPurchasePrice.value.trim();
+    let purchasePrice = null;
+    if (purchasePriceRaw !== '') {
+      const parsedPurchasePrice = parseFloat(purchasePriceRaw);
+      if (!isNaN(parsedPurchasePrice)) purchasePrice = parsedPurchasePrice;
+    }
+    // If tax field is empty or whitespace, send null; otherwise parse float
+    const taxRaw = editTax.value.trim();
+    let tax = null;
+    if (taxRaw !== '') {
+      const parsed = parseFloat(taxRaw);
+      if (!isNaN(parsed)) tax = parsed;
+    }
+    const uom = editUom.value;
+
+    if (!name || isNaN(price) || !uom) {
+      alert('Please enter a valid name, selling price, and unit of measurement.');
+      return;
+    }
+
+    saveEditBtn.disabled = true;
+    saveEditBtn.textContent = 'Saving…';
+
+    try {
+      const response = await fetch('/edit_product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId, name, sku, price, purchase_price: purchasePrice, tax, uom })
+      });
+
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.message || 'Failed to update product.');
+        return;
+      }
+
+      // Update row in table
+      if (currentEditRow) {
+        currentEditRow.querySelector('.product-name').textContent = name;
+        currentEditRow.querySelector('.product-sku').textContent = sku === '' ? '-' : sku;
+        currentEditRow.querySelector('.product-price').textContent = formatMoney(price);
+        // Update purchase price cell: show '-' if purchase price is null, else formatted money
+        const purchasePriceCell = currentEditRow.querySelector('.product-purchase-price');
+        if (purchasePrice === null || purchasePrice === undefined) {
+          purchasePriceCell.textContent = '-';
+        } else {
+          purchasePriceCell.textContent = formatMoney(purchasePrice);
+        }
+        // Update tax cell: show '-' if tax is null, else tax + '%'
+        const taxCell = currentEditRow.querySelector('.product-tax');
+        if (tax === null || tax === undefined) {
+          taxCell.textContent = '-';
+        } else {
+          taxCell.textContent = tax + '%';
+        }
+        // Keep sort data attributes in sync with the edited values
+        currentEditRow.dataset.name = name;
+        currentEditRow.dataset.price = price;
+        currentEditRow.dataset.purchasePrice = (purchasePrice === null || purchasePrice === undefined) ? '' : purchasePrice;
+        currentEditRow.dataset.tax = (tax === null || tax === undefined) ? '' : tax;
+        currentEditRow.querySelector('.product-uom').textContent = uom;
+      }
+
+      closeEditModal();
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while saving.');
+    } finally {
+      saveEditBtn.disabled = false;
+      saveEditBtn.textContent = 'Save';
+    }
+  });
+
+  // ---- Product Codes & Picture Modal ----
+  const codesModal = document.getElementById('productCodesModal');
+  const codesSubtitle = document.getElementById('productCodesSubtitle');
+  const closeCodesBtn = document.getElementById('closeCodesBtn');
+  const codesFileInput = document.getElementById('codesFileInput');
+
+  const codeBoxes = {
+    barcode: document.getElementById('barcodeBox'),
+    qrcode: document.getElementById('qrcodeBox'),
+    picture: document.getElementById('pictureBox')
+  };
+
+  let currentCodesRow = null;   // row currently shown in the modal
+  let pendingUploadField = null; // which slot ('barcode' | 'qrcode' | 'picture') is being uploaded
+
+  // Renders one slot: shows the image if a URL/dataURL is set on the row,
+  // otherwise shows a "+" button that lets the user pick a file for it.
+  function renderCodeSlot(field, imageUrl) {
+    const box = codeBoxes[field];
+    box.innerHTML = '';
+
+    if (imageUrl) {
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.alt = field;
+      box.appendChild(img);
+
+      // Small overlay button to replace the existing image
+      const replaceBtn = document.createElement('button');
+      replaceBtn.type = 'button';
+      replaceBtn.className = 'code-slot-replace';
+      replaceBtn.title = 'Replace image';
+      replaceBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a6 6 0 0 1 10.24-4.24M16 10a6 6 0 0 1-10.24 4.24"/><path d="M14 3v3.5H10.5M6 17v-3.5H9.5"/></svg>';
+      replaceBtn.addEventListener('click', () => triggerUpload(field));
+      box.appendChild(replaceBtn);
+
+      // Small overlay button to remove the existing image
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'code-slot-remove';
+      removeBtn.title = 'Remove image';
+      removeBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l10 10M15 5L5 15"/></svg>';
+      removeBtn.addEventListener('click', () => removeCodeImage(field));
+      box.appendChild(removeBtn);
+    } else {
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'code-slot-add';
+      addBtn.title = 'Upload ' + field;
+      addBtn.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>';
+      addBtn.addEventListener('click', () => triggerUpload(field));
+      box.appendChild(addBtn);
+    }
+  }
+
+  function triggerUpload(field) {
+    pendingUploadField = field;
+    codesFileInput.value = '';
+    codesFileInput.click();
+  }
+
+  // Shows a small inline status while the request is in flight
+  function renderCodeSlotLoading(field) {
+    const box = codeBoxes[field];
+    box.innerHTML = '<span class="code-slot-status">Uploading…</span>';
+  }
+
+  async function removeCodeImage(field) {
+    const row = currentCodesRow;
+    if (!row) return;
+
+    const productId = row.dataset.productId;
+    const box = codeBoxes[field];
+    box.innerHTML = '<span class="code-slot-status">Removing…</span>';
+
+    try {
+      const res = await fetch('/delete_product_image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_id: productId, field: field })
+      });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        data = null;
+      }
+
+      if (!res.ok || !data || !data.success) {
+        const message = (data && data.message) || 'The image could not be removed.';
+        alert(message);
+        renderCodeSlot(field, row.dataset[field] || '');
+        return;
+      }
+
+      row.dataset[field] = '';
+      renderCodeSlot(field, '');
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while removing the image. Please try again.');
+      renderCodeSlot(field, row.dataset[field] || '');
+    }
+  }
+
+  codesFileInput.addEventListener('change', async () => {
+    const file = codesFileInput.files && codesFileInput.files[0];
+    const field = pendingUploadField;
+    const row = currentCodesRow;
+    if (!file || !field || !row) return;
+
+    const productId = row.dataset.productId;
+    renderCodeSlotLoading(field);
+
+    try {
+      const formData = new FormData();
+      formData.append('product_id', productId);
+      formData.append('field', field);
+      formData.append('image', file);
+
+      const res = await fetch('/upload_product_image', {
+        method: 'POST',
+        body: formData
+      });
+
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        data = null;
+      }
+
+      if (!res.ok || !data || !data.success) {
+        const message = (data && data.message) || 'The image could not be uploaded.';
+        alert(message);
+        // Restore whatever was there before the failed attempt
+        renderCodeSlot(field, row.dataset[field] || '');
+        return;
+      }
+
+      row.dataset[field] = data.url;
+      renderCodeSlot(field, data.url);
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while uploading. Please try again.');
+      renderCodeSlot(field, row.dataset[field] || '');
+    } finally {
+      pendingUploadField = null;
+    }
+  });
+
+  function openCodesModal(row) {
+    currentCodesRow = row;
+    const name = row.querySelector('.product-name').textContent.trim();
+    codesSubtitle.textContent = name;
+
+    renderCodeSlot('barcode', row.dataset.barcode || '');
+    renderCodeSlot('qrcode', row.dataset.qrcode || '');
+    renderCodeSlot('picture', row.dataset.picture || '');
+
+    codesModal.classList.add('open');
+  }
+
+  function closeCodesModal() {
+    codesModal.classList.remove('open');
+    currentCodesRow = null;
+    pendingUploadField = null;
+  }
+
+  closeCodesBtn.addEventListener('click', closeCodesModal);
+  codesModal.addEventListener('click', (e) => {
+    if (e.target === codesModal) closeCodesModal();
+  });
+
+  // ---- Table row click: open edit modal (unless Remove button clicked) ----
+  const productsTableBody = document.getElementById('productsTableBody');
+
+  productsTableBody.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+      // Remove button handling is separate; prevent opening edit modal
+      e.stopPropagation();
+      deleteProduct(removeBtn);
+      return;
+    }
+
+    const codesBtn = e.target.closest('.codes-btn');
+    if (codesBtn) {
+      // Codes/picture button handling is separate; prevent opening edit modal
+      e.stopPropagation();
+      const row = codesBtn.closest('.product-row');
+      if (row) openCodesModal(row);
+      return;
+    }
+
+    const row = e.target.closest('.product-row');
+    if (row) {
+      openEditModal(row);
+    }
+  });
+
+  // ---- Delete Confirmation Modal (recipe-linked products) ----
+  const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+  const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
+  const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+  const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+
+  let pendingDeleteProductId = null;
+  let pendingDeleteBtn = null;
+
+  function openDeleteConfirmModal(message, productId, removeBtn) {
+    deleteConfirmMessage.textContent = message;
+    pendingDeleteProductId = productId;
+    pendingDeleteBtn = removeBtn;
+    deleteConfirmModal.classList.add('open');
+  }
+
+  function closeDeleteConfirmModal() {
+    deleteConfirmModal.classList.remove('open');
+    pendingDeleteProductId = null;
+    pendingDeleteBtn = null;
+    confirmDeleteBtn.disabled = false;
+    confirmDeleteBtn.textContent = 'Delete';
+  }
+
+  cancelDeleteBtn.addEventListener('click', () => {
+    if (pendingDeleteBtn) pendingDeleteBtn.disabled = false;
+    closeDeleteConfirmModal();
+  });
+
+  deleteConfirmModal.addEventListener('click', (e) => {
+    if (e.target === deleteConfirmModal) {
+      if (pendingDeleteBtn) pendingDeleteBtn.disabled = false;
+      closeDeleteConfirmModal();
+    }
+  });
+
+  confirmDeleteBtn.addEventListener('click', () => {
+    if (!pendingDeleteProductId) return;
+    confirmDeleteBtn.disabled = true;
+    confirmDeleteBtn.textContent = 'Deleting…';
+    performDelete(pendingDeleteProductId, pendingDeleteBtn, true);
+  });
+
+  // ---- Delete product ----
+  // Two-step flow: the backend returns 409 + requires_confirmation when the
+  // product is tied to a recipe (as an output or an ingredient). In that case
+  // we show the reason in a modal and, if the user confirms, retry the same
+  // request with confirm: true so the backend proceeds with the deletion.
+  function deleteProduct(removeBtn) {
+    const productId = removeBtn.dataset.productId;
+    removeBtn.disabled = true;
+    performDelete(productId, removeBtn, false);
+  }
+
+  function performDelete(productId, removeBtn, confirmed) {
+    fetch('/delete_product', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: productId, confirm: confirmed })
+    })
+      .then(async response => {
+        const data = await response.json().catch(() => ({}));
+
+        if (response.status === 409 && data.requires_confirmation) {
+          openDeleteConfirmModal(
+            data.message || 'This product is linked to a recipe. Delete anyway?',
+            productId,
+            removeBtn
+          );
+          return;
+        }
+
+        if (deleteConfirmModal.classList.contains('open')) closeDeleteConfirmModal();
+
+        if (data.success) {
+          const row = productsTableBody.querySelector(`tr[data-product-id="${productId}"]`);
+          if (row) row.remove();
+          toggleNoProductsRow();
+        } else {
+          alert('Error: ' + (data.message || 'Could not delete product.'));
+          if (removeBtn) removeBtn.disabled = false;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        if (deleteConfirmModal.classList.contains('open')) closeDeleteConfirmModal();
+        alert('Something went wrong while removing the product.');
+        if (removeBtn) removeBtn.disabled = false;
+      });
+  }
+
+  // ---- Helper: format money (same as Jinja filter) ----
+  function formatMoney(value) {
+    const num = parseFloat(value);
+    const amount = isNaN(num) ? 0 : num;
+    const formattedNumber = amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    const label = CURRENCY_SYMBOLS[accountCurrency] || accountCurrency;
+    return `${formattedNumber} ${label}`;
+  }
+
+  // ---- Toggle "no products" row ----
+  function toggleNoProductsRow() {
+    const hasRows = productsTableBody.querySelectorAll('tr.product-row').length > 0;
+    let noRow = document.getElementById('no-products-row');
+
+    if (!hasRows && !noRow) {
+      noRow = document.createElement('tr');
+      noRow.className = 'no-products-row';
+      noRow.id = 'no-products-row';
+      noRow.innerHTML = '<td colspan="8">No products available.</td>';
+      productsTableBody.appendChild(noRow);
+    } else if (hasRows && noRow) {
+      noRow.remove();
+    }
+  }
+
+  // ---- Search / filter ----
+  const searchInput = document.getElementById('inv-search-input');
+
+  function toggleNoSearchResultsRow(show) {
+    let row = document.getElementById('no-search-results-row');
+    if (show && !row) {
+      row = document.createElement('tr');
+      row.className = 'no-products-row';
+      row.id = 'no-search-results-row';
+      row.innerHTML = '<td colspan="8">No matching products found</td>';
+      productsTableBody.appendChild(row);
+    } else if (!show && row) {
+      row.remove();
+    }
+  }
+
+  function filterProducts() {
+    const term = searchInput.value.trim().toLowerCase();
+    const rows = productsTableBody.querySelectorAll('tr.product-row');
+
+    if (rows.length === 0) {
+      toggleNoSearchResultsRow(false);
+      return;
+    }
+
+    let anyVisible = false;
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    toggleNoSearchResultsRow(!anyVisible);
+  }
+
+  searchInput.addEventListener('input', filterProducts);
+
+  // ---- Sort dropdown (defaults to Product Name A–Z) ----
+  const invSortSelect = document.getElementById('inv-sort-select');
+
+  function sortProductRows() {
+    const sortValue = invSortSelect.value || 'name_asc';
+    const rows = Array.from(productsTableBody.querySelectorAll('tr.product-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'price_asc' || sortValue === 'price_desc') {
+        const priceA = parseFloat(a.dataset.price) || 0;
+        const priceB = parseFloat(b.dataset.price) || 0;
+        return sortValue === 'price_asc' ? priceA - priceB : priceB - priceA;
+      } else if (sortValue === 'tax_asc' || sortValue === 'tax_desc') {
+        // Products with no tax set are treated as 0 and sort to the low end.
+        const taxA = parseFloat(a.dataset.tax) || 0;
+        const taxB = parseFloat(b.dataset.tax) || 0;
+        return sortValue === 'tax_asc' ? taxA - taxB : taxB - taxA;
+      } else {
+        const nameA = (a.dataset.name || '').toLowerCase();
+        const nameB = (b.dataset.name || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortValue === 'name_asc' ? cmp : -cmp;
+      }
+    });
+
+    rows.forEach(row => productsTableBody.appendChild(row));
+  }
+
+  invSortSelect.addEventListener('change', sortProductRows);
+
+  // Apply the default sort (Product Name A–Z) as soon as the page loads
+  sortProductRows();
+</script>
+
+{% endblock %}

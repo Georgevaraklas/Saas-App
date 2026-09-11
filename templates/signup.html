@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<title>ΤΕΦΤΕΡΙ | Sign In</title>
+<link href="/static/styless.css" rel="stylesheet">
+
+</head>
+<body>
+
+<div class="auth-shell">
+
+  <div class="brand-panel">
+    <img src="https://cdn-icons-png.flaticon.com/512/2232/2232688.png" alt="Λογότυπο">
+    <h1>ΤΕΦΤΕΡΙ</h1>
+    <p>The leading platform for stock management & monitoring</p>
+  </div>
+
+  <div class="form-panel">
+
+    <!-- LOGIN -->
+    <div id="loginBlock">
+      <h2 class="page-title">Welcome</h2>
+      <p class="page-sub">Create an account to continue.</p>
+
+      <form id="loginForm" class="active" action="/signup" method="POST" enctype="multipart/form-data">
+        <div class="field">
+          <label>Company Logo (optional)</label>
+          <div class="logo-upload-wrap" id="logoUploadWrap">
+            <img id="logoPreviewImg" class="logo-preview-img" alt="" style="display:none;">
+            <span id="logoUploadHint" class="logo-upload-hint">Upload<br>Logo</span>
+            <input type="file" id="logoInput" name="logo" accept="image/png, image/jpeg, image/webp, image/svg+xml">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="loginUser">Email</label>
+          <div class="input-wrap">
+            <input type="email" id="loginUser" placeholder="Email" name="email" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="bname">Business Name</label>
+          <div class="input-wrap">
+            <input type="text" id="bname" placeholder="Business Name" name="bname" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="phone">Phone Number</label>
+          <div class="input-wrap">
+            <input type="text" id="phone" placeholder="Phone Number" name="phone" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="vat">VAT Number</label>
+          <div class="input-wrap">
+            <input type="text" id="vat" placeholder="VAT Number" name="vat" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="address">Address</label>
+          <div class="input-wrap">
+            <input type="text" id="address" placeholder="Address" name="address" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="input-wrap">
+            <input type="password" id="password" placeholder="••••••••" name="password" required>
+            <button type="button" class="toggle-pass" onclick="togglePassword('password', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
+            <circle cx="12" cy="12" r="3"/>
+            </svg></button>
+          </div>
+        </div>
+
+        <button type="submit" class="submit-btn">Sign Up</button>
+      </form>
+
+      <p class="switch-text">Already have an account? <button id="siBtn">Sign in here</button></p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  document.getElementById("siBtn").addEventListener("click", function() {
+    window.location.href = "/login";
+  });
+
+  const eyeOpenSVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
+  <circle cx="12" cy="12" r="3"/>
+</svg>`;
+
+const eyeClosedSVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
+  <circle cx="12" cy="12" r="3"/>
+  <line x1="2" y1="2" x2="22" y2="22"/>
+</svg>`;
+
+function togglePassword(fieldId, btn){
+  const input = document.getElementById(fieldId);
+  if(input.type === 'password'){
+    input.type = 'text';
+    btn.innerHTML = eyeClosedSVG;
+  } else {
+    input.type = 'password';
+    btn.innerHTML = eyeOpenSVG;
+  }
+}
+
+// ---- Logo upload preview ----
+const logoUploadWrap = document.getElementById('logoUploadWrap');
+const logoInput = document.getElementById('logoInput');
+const logoPreviewImg = document.getElementById('logoPreviewImg');
+const logoUploadHint = document.getElementById('logoUploadHint');
+
+logoUploadWrap.addEventListener('click', function() {
+  logoInput.click();
+});
+
+logoInput.addEventListener('change', function() {
+  const file = logoInput.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    logoPreviewImg.src = e.target.result;
+    logoPreviewImg.style.display = 'block';
+    logoUploadHint.style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+});
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,297 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Pending Orders
+{% endblock %}
+
+{% block styles %}
+  <link href="/static/popup.css" rel="stylesheet">
+  <style>
+    /* =======================================================
+       ΤΕΦΤΕΡΙ — Home page
+       Redesigned to match layout.html's visual language:
+       neutral #F1F1F3 canvas, white rounded cards (18-20px),
+       soft layered shadows, #1c1c1c ink, pill-shaped badges.
+       ======================================================= */
+
+    .home-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    /* ---------------- Page header ---------------- */
+    .home-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .home-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .home-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    .btn-new-order {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      background: #1c1c1c;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px 20px;
+      border-radius: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .btn-new-order:hover {
+      background: #303030;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .btn-new-order:active {
+      transform: translateY(0);
+    }
+    .btn-new-order svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+    }
+
+    /* ---------------- Section heading above the table ---------------- */
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    /* =======================================================
+       PENDING ORDERS TABLE — untouched styling, preserved as-is
+       ======================================================= */
+
+    .oh-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .oh-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .oh-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .oh-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .oh-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .oh-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .oh-table-wrapper .no-products-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .oh-row {
+      cursor: default;
+    }
+    .oh-row:hover {
+      background: #fafafa;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .status-pill.paid {
+      background: #e6f6ea;
+      color: #1a7f37;
+    }
+    .status-pill.pending {
+      background: #fdf1e2;
+      color: #b8860b;
+    }
+
+    .type-pill {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #eef1ff;
+      color: #3547d1;
+      text-transform: capitalize;
+    }
+
+    /* ---------------- Table card wrapper (new outer shell) ---------------- */
+    .pending-orders-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    @media (max-width: 700px) {
+      .home-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .btn-new-order {
+        width: 100%;
+        justify-content: center;
+      }
+      .pending-orders-card {
+        padding: 16px 14px 20px;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+<div class="home-wrap">
+
+  <div class="home-header">
+    <div>
+      <p class="greeting-eyebrow">Overview</p>
+      <h1>Welcome back{% if account and account.fullname %}, {{ account.fullname.split(' ')[0] }}{% endif %}</h1>
+    </div>
+    <button class="btn-new-order" id="neworderBtn">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+      New Order
+    </button>
+  </div>
+
+  <div class="popup-overlay" id="overlay">
+    <div class="popup-modal">
+      <form id="orderForm" action="/add_order" method="POST">
+        <h2>New Order</h2>
+        <label for="customerName">Customer Name</label>
+        <select id="customerName" name="customer_name" required>
+          <option value="">Select Customer</option>
+          {% for customer in customers %}
+            <option value="{{ customer['id'] }}">{{ customer['name'] }}</option>
+          {% endfor %}
+        </select>
+
+        <label for="deliveryDate">Delivery Date</label>
+        <input type="date" id="deliveryDate" name="delivery_date" required>
+
+        <label for="productTax">Tax (Optional)</label>
+        <input type="number" id="productTax" placeholder="%" step="0.01" min="0" name="tax">
+
+        <div class="popup-modal-actions">
+          <button class="popup-cancel-btn" id="cancelBtn">Cancel</button>
+          <button class="popup-save-btn" id="saveBtn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="pending-orders-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">Pending Orders</h2>
+      <span class="section-sub">{{ orders|length if orders else 0 }} open</span>
+    </div>
+
+    <div class="oh-table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Client Name</th>
+            <th>VAT Number</th>
+            <th>Order Type</th>
+            <th>Payment Status</th>
+            <th>Issue Date</th>
+            <th>Due Date</th>
+            <th>Transfer Company</th>
+          </tr>
+        </thead>
+        <tbody id="pending-orders-body">
+          {% if orders %}
+            {% for order in orders %}
+              <tr class="oh-row" data-order-id="{{ order.oid }}">
+                <td>{{ order.oid }}</td>
+                <td class="product-name">{{ order.customer_name }}</td>
+                <td>{{ order.cafm }}</td>
+                <td><span class="type-pill">{{ order.order_type }}</span></td>
+                <td>
+                  {% if order.pstatus == 'Paid' %}
+                    <span class="status-pill paid">{{ order.pstatus }}</span>
+                  {% else %}
+                    <span class="status-pill pending">{{ order.pstatus }}</span>
+                  {% endif %}
+                </td>
+                <td>{{ order.rdate }}</td>
+                <td>{{ order.edate }}</td>
+                <td>{{ order.tcompany }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr class="no-products-row" id="no-orders-row">
+              <td colspan="8">No pending orders found</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+document.getElementById('neworderBtn').addEventListener('click', () => {
+    window.location.href = '/new_order';
+  });
+</script>
+{% endblock %}

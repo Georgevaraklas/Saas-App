@@ -1,0 +1,542 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    New Order
+{% endblock %}
+
+{% block styles %}
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    .customer-search {
+      position: relative;
+      width: 100%;
+    }
+    .customer-search-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .customer-search-results {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      z-index: 20;
+    }
+    .customer-search-results.open {
+      display: block;
+    }
+    .customer-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .customer-option:hover,
+    .customer-option.active {
+      background: #f2f2f2;
+    }
+    .customer-option.no-match {
+      cursor: default;
+      color: #888;
+      font-style: italic;
+    }
+    .customer-option.no-match:hover {
+      background: transparent;
+    }
+    .customer-option.hidden {
+      display: none;
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="page">
+    
+<form id="orderForm" action="/new_order" method="POST">
+      
+  <div class="mtopbar">
+    <button class="back-btn" id="mmback-btn" type="button">&larr; Back to Orders</button>
+    <div class="mtop-actions">
+      
+      <button class="mbtn" type="submit">Save Order</button>
+    </div>
+  </div>
+
+  <h2>Customer Details</h2>
+  <div class="field-row">
+    <div class="field">
+      <label>Business Name</label>
+      <div class="customer-search" id="customer-search">
+        <input type="text" id="customer-search-input" class="customer-search-input" placeholder="Customer Name" autocomplete="off">
+        <input type="hidden" id="customer-select" name="customer_id" value="">
+        <div class="customer-search-results" id="customer-search-results">
+          {% for customer in customers %}
+            <div class="customer-option" data-id="{{ customer['id'] }}" data-afm="{{ customer['afm'] }}" data-name="{{ customer['name'] }}">{{ customer['name'] }}</div>
+          {% endfor %}
+          <div class="customer-option no-match" id="customer-no-match" style="display:none;">No matching customers</div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>VAT Number</label>
+      <input type="text" id="vat-display" readonly placeholder="VAT Number">
+    </div>
+    <div class="field">
+      <label>Salesperson (Optional)</label>
+      <input type="text" placeholder="Salesperson" name="salesperson">
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Order Details</h2>
+  <div class="order-type">
+    <label><input type="radio" name="order_type" value="receipt"> Receipt</label>
+    <label><input type="radio" name="order_type" value="invoice"> Invoice</label>
+    <label><input type="radio" name="order_type" value="custom"> Custom</label>
+  </div>
+
+  <div class="field-row">
+    <div class="field">
+      <label>Order Date</label>
+      <input type="date" name="order_date">
+    </div>
+    <div class="field">
+      <label>Transfer Company (Optional)</label>
+      <input type="text" placeholder="Transfer Company" name="transfer_company">
+    </div>
+    <div class="field">
+      <label>Payment Status</label>
+      <select name="payment_status">
+        <option>Paid</option>
+        <option>Pending Payment</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Due Date (Optional)</label>
+      <input type="date" name="due_date">
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>SKU</th>
+        <th>Price</th>
+        <th>LOT Number</th>
+        <th>Quantity</th>
+        <th>Subtotal</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="product-table-body">
+      <!-- rows get added here by JS; "no products" row shown when empty -->
+      <tr class="no-products-row" id="no-products-row">
+        <td colspan="7">No products added yet</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="table-footer">
+    <button class="add-btn" id="open-modal-btn" type="button">&#10009; Add another item</button>
+    <div>
+      <span class="total-label">Total : </span>
+      <span class="total-amount" id="total-amount">{{ 0 | currency(account.currency if account else 'USD') }}</span>
+    </div>
+  </div>
+</div>
+
+  <div class="field comments-field" style="width: 100%; margin-top: 16px;">
+    <label for="comments-input">Comments</label>
+    <textarea id="comments-input" name="comments" placeholder="Add any comments about this order..." rows="4" style="width: 100%; box-sizing: border-box; resize: vertical; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: #fff; color: #111; font-family: inherit;"></textarea>
+  </div>
+
+  <input type="hidden" name="products" id="products-json">
+
+  <div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <h3>Add Product</h3>
+
+    <div class="form-group">
+      <label for="product-search-input">Product</label>
+      <div class="customer-search" id="product-search">
+        <input type="text" id="product-search-input" class="customer-search-input" placeholder="Search product..." autocomplete="off">
+        <input type="hidden" id="product-select" value="">
+        <div class="customer-search-results" id="product-search-results">
+          {% for product in products %}
+            <div class="customer-option" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-pid="{{ product.pid }}" data-sku="{{ product.sku or '' }}">{{ product.name }}</div>
+          {% endfor %}
+          <div class="customer-option no-match" id="product-no-match" style="display:none;">No matching products</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="sku-display">SKU</label>
+      <input type="text" id="sku-display" readonly>
+    </div>
+
+    <div class="form-group">
+      <label for="price-display">Price</label>
+      <input type="text" id="price-display" readonly>
+    </div>
+
+    <div class="form-group">
+      <label for="quantity-input">Quantity</label>
+      <input type="number" id="quantity-input" min="1" value="1">
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" id="cancel-modal-btn" type="button">Cancel</button>
+      <button class="btn-primary" id="confirm-add-btn" type="button">Add</button>
+    </div>
+  </div>
+</div>
+
+</div>
+</form>
+<script>
+
+  // Account's chosen currency (ISO code), passed from the server.
+  // Falls back to USD if the account/currency isn't set for any reason.
+  const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
+
+  // Mirrors the symbol set in currency_filter.py - keep the two in sync.
+  // Only currencies with a widely-recognized, unambiguous symbol are
+  // listed; everything else falls back to its 3-letter ISO code.
+  const CURRENCY_SYMBOLS = {
+    USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', CHF: 'CHF',
+    INR: '₹', KRW: '₩', VND: '₫', TRY: '₺', ILS: '₪', THB: '฿', PHP: '₱'
+  };
+
+  const tableBody = document.getElementById('product-table-body');
+  const noProductsRow = document.getElementById('no-products-row');
+  const totalAmountEl = document.getElementById('total-amount');
+
+  const modalOverlay = document.getElementById('modal-overlay');
+  const openModalBtn = document.getElementById('open-modal-btn');
+  const cancelModalBtn = document.getElementById('cancel-modal-btn');
+  const confirmAddBtn = document.getElementById('confirm-add-btn');
+
+  const productSelect = document.getElementById('product-select');
+  const priceDisplay = document.getElementById('price-display');
+  const skuDisplay = document.getElementById('sku-display');
+  const quantityInput = document.getElementById('quantity-input');
+
+  let rowCounter = 0;
+
+  function formatMoney(value) {
+    const num = parseFloat(value);
+    const amount = isNaN(num) ? 0 : num;
+    const formattedNumber = amount.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    const label = CURRENCY_SYMBOLS[accountCurrency] || accountCurrency;
+    return `${formattedNumber} ${label}`;
+  }
+
+  function updatePriceDisplay() {
+    const price = parseFloat(productSelect.dataset.price || 0);
+    priceDisplay.value = productSelect.value ? formatMoney(price) : '';
+    skuDisplay.value = productSelect.value ? (productSelect.dataset.sku || '-') : '';
+  }
+
+  function openModal() {
+    productSelect.value = '';
+    delete productSelect.dataset.name;
+    delete productSelect.dataset.price;
+    delete productSelect.dataset.pid;
+    delete productSelect.dataset.sku;
+    document.getElementById('product-search-input').value = '';
+    updatePriceDisplay();
+    quantityInput.value = 1;
+    modalOverlay.classList.add('open');
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove('open');
+  }
+
+  function recalcTotal() {
+    const subtotalCells = document.querySelectorAll('.subtotal-cell');
+    let total = 0;
+    subtotalCells.forEach(cell => {
+      total += parseFloat(cell.dataset.value || 0);
+    });
+    totalAmountEl.textContent = formatMoney(total);
+  }
+
+  function toggleNoProductsRow() {
+    const hasRows = tableBody.querySelectorAll('tr[data-row-id]').length > 0;
+    noProductsRow.style.display = hasRows ? 'none' : '';
+  }
+
+  function getJulianDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const startOfYear = new Date(year, 0, 0);
+    const diffMs = now - startOfYear;
+    const dayOfYear = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const dayStr = String(dayOfYear).padStart(3, '0');
+    return `${year}${dayStr}`;
+  }
+
+  function generateLotNumber(pid) {
+    const julian = getJulianDate();
+    // keep digits only, then take the first 5
+    const digitsOnly = String(pid || '').replace(/\D/g, '');
+    const pidPart = digitsOnly.substring(0, 5).padStart(5, '0');
+    return julian + pidPart;
+  }
+
+  function addProductRow(productId, name, price, quantity, pid, sku) {
+    rowCounter += 1;
+    const rowId = 'row-' + rowCounter;
+    const subtotal = price * quantity;
+
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-row-id', rowId);
+    tr.setAttribute('data-product-id', productId);
+    tr.setAttribute('data-price', price);
+    tr.setAttribute('data-quantity', quantity);
+    tr.setAttribute('data-pid', pid || '');
+    tr.setAttribute('data-sku', sku || '');
+
+    tr.innerHTML = `
+      <td class="product-name">${name}</td>
+      <td class="product-sku">${sku || '-'}</td>
+      <td>${formatMoney(price)}</td>
+      <td>
+        <div class="lot-cell">
+          <input type="text" class="lot-input" placeholder="Enter LOT #">
+          <button type="button" class="lot-gen-btn" title="Auto-generate LOT number">&#43;</button>
+        </div>
+      </td>
+      <td class="quantity-cell">${quantity} Item</td>
+      <td class="subtotal-cell" data-value="${subtotal}">${formatMoney(subtotal)}</td>
+      <td><button type="button" class="remove-btn">Remove</button></td>
+    `;
+
+    tr.querySelector('.remove-btn').addEventListener('click', () => {
+      tr.remove();
+      toggleNoProductsRow();
+      recalcTotal();
+    });
+
+    tr.querySelector('.lot-gen-btn').addEventListener('click', () => {
+      const lotInput = tr.querySelector('.lot-input');
+      lotInput.value = generateLotNumber(tr.dataset.pid);
+    });
+
+    tableBody.appendChild(tr);
+    toggleNoProductsRow();
+    recalcTotal();
+  }
+
+  openModalBtn.addEventListener('click', openModal);
+  cancelModalBtn.addEventListener('click', closeModal);
+
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) closeModal();
+  });
+
+  confirmAddBtn.addEventListener('click', () => {
+    const productId = productSelect.value;
+    const name = productSelect.dataset.name;
+    const price = parseFloat(productSelect.dataset.price);
+    const pid = productSelect.dataset.pid;
+    const sku = productSelect.dataset.sku;
+    const quantity = parseInt(quantityInput.value, 10);
+
+    if (!productId) {
+      alert('Please select a product.');
+      return;
+    }
+
+    if (!quantity || quantity < 1) {
+      alert('Please enter a valid quantity.');
+      return;
+    }
+
+    addProductRow(productId, name, price, quantity, pid, sku);
+    closeModal();
+  });
+
+  // searchable customer dropdown
+  const customerSearchInput = document.getElementById('customer-search-input');
+  const customerSelect = document.getElementById('customer-select');
+  const customerResults = document.getElementById('customer-search-results');
+  const customerNoMatch = document.getElementById('customer-no-match');
+  const customerOptions = Array.from(customerResults.querySelectorAll('.customer-option:not(.no-match)'));
+  const vatDisplay = document.getElementById('vat-display');
+
+  function openCustomerResults() {
+    customerResults.classList.add('open');
+  }
+
+  function closeCustomerResults() {
+    customerResults.classList.remove('open');
+  }
+
+  function filterCustomerOptions() {
+    const query = customerSearchInput.value.trim().toLowerCase();
+    let visibleCount = 0;
+
+    customerOptions.forEach(option => {
+      const matches = option.dataset.name.toLowerCase().includes(query);
+      option.classList.toggle('hidden', !matches);
+      if (matches) visibleCount += 1;
+    });
+
+    customerNoMatch.style.display = visibleCount === 0 ? '' : 'none';
+  }
+
+  function selectCustomer(option) {
+    customerSelect.value = option.dataset.id;
+    vatDisplay.value = option.dataset.afm || '';
+    customerSearchInput.value = option.dataset.name;
+    closeCustomerResults();
+  }
+
+  customerSearchInput.addEventListener('focus', () => {
+    filterCustomerOptions();
+    openCustomerResults();
+  });
+
+  customerSearchInput.addEventListener('input', () => {
+    // typing invalidates any previously selected customer until a new one is chosen
+    customerSelect.value = '';
+    vatDisplay.value = '';
+    filterCustomerOptions();
+    openCustomerResults();
+  });
+
+  customerOptions.forEach(option => {
+    option.addEventListener('click', () => selectCustomer(option));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('customer-search').contains(e.target)) {
+      closeCustomerResults();
+    }
+  });
+
+  // searchable product dropdown (Add Product modal)
+  const productSearchInput = document.getElementById('product-search-input');
+  const productResults = document.getElementById('product-search-results');
+  const productNoMatch = document.getElementById('product-no-match');
+  const productOptions = Array.from(productResults.querySelectorAll('.customer-option:not(.no-match)'));
+
+  function openProductResults() {
+    productResults.classList.add('open');
+  }
+
+  function closeProductResults() {
+    productResults.classList.remove('open');
+  }
+
+  function filterProductOptions() {
+    const query = productSearchInput.value.trim().toLowerCase();
+    let visibleCount = 0;
+
+    productOptions.forEach(option => {
+      const matches = option.dataset.name.toLowerCase().includes(query)
+        || (option.dataset.sku || '').toLowerCase().includes(query);
+      option.classList.toggle('hidden', !matches);
+      if (matches) visibleCount += 1;
+    });
+
+    productNoMatch.style.display = visibleCount === 0 ? '' : 'none';
+  }
+
+  function selectProduct(option) {
+    productSelect.value = option.dataset.id;
+    productSelect.dataset.name = option.dataset.name;
+    productSelect.dataset.price = option.dataset.price;
+    productSelect.dataset.pid = option.dataset.pid;
+    productSelect.dataset.sku = option.dataset.sku;
+    productSearchInput.value = option.dataset.name.trim();
+    closeProductResults();
+    updatePriceDisplay();
+  }
+
+  productSearchInput.addEventListener('focus', () => {
+    filterProductOptions();
+    openProductResults();
+  });
+
+  productSearchInput.addEventListener('input', () => {
+    // typing invalidates any previously selected product until a new one is chosen
+    productSelect.value = '';
+    delete productSelect.dataset.name;
+    delete productSelect.dataset.price;
+    delete productSelect.dataset.pid;
+    delete productSelect.dataset.sku;
+    updatePriceDisplay();
+    filterProductOptions();
+    openProductResults();
+  });
+
+  productOptions.forEach(option => {
+    option.addEventListener('click', () => selectProduct(option));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('product-search').contains(e.target)) {
+      closeProductResults();
+    }
+  });
+
+  // build the products list as JSON and put it in the hidden field before submitting
+  const orderForm = document.getElementById('orderForm');
+  const productsJsonInput = document.getElementById('products-json');
+
+  orderForm.addEventListener('submit', (e) => {
+    const rows = tableBody.querySelectorAll('tr[data-row-id]');
+
+    if (rows.length === 0) {
+      e.preventDefault();
+      alert('Please add at least one product to the order.');
+      return;
+    }
+
+    const products = Array.from(rows).map(tr => {
+      const price = parseFloat(tr.dataset.price);
+      const quantity = parseInt(tr.dataset.quantity, 10);
+      const lotInput = tr.querySelector('.lot-input');
+      return {
+        product_id: tr.dataset.productId,
+        name: tr.querySelector('.product-name').textContent,
+        sku: tr.dataset.sku || '',
+        price: price,
+        quantity: quantity,
+        lot_number: lotInput ? lotInput.value : '',
+        subtotal: price * quantity
+      };
+    });
+
+    productsJsonInput.value = JSON.stringify(products);
+  });
+
+  // initialize
+  toggleNoProductsRow();
+  recalcTotal();
+
+
+  document.getElementById('mmback-btn').addEventListener('click', () => {
+    window.location.href = '/';
+  });
+
+</script>
+
+{% endblock %}

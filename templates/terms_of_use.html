@@ -1,0 +1,199 @@
+{% extends "settings_base.html" %}
+
+{% block settings_title %}Terms of Use{% endblock %}
+
+{% block settings_styles %}
+  /* ---- Terms of Use page ---- */
+  .tou-header {
+    margin-bottom: 24px;
+  }
+  .tou-header h2 {
+    margin: 0 0 4px;
+  }
+  .tou-updated {
+    margin: 0;
+    color: #999;
+    font-size: 13px;
+  }
+
+  .tou-content {
+    max-width: 760px;
+  }
+  .tou-content p {
+    line-height: 1.6;
+    color: #444;
+    margin: 0 0 16px;
+  }
+
+  .tou-section {
+    padding: 22px 0;
+    border-top: 1px solid #f0f0f0;
+  }
+  .tou-section:first-of-type {
+    border-top: none;
+    padding-top: 0;
+  }
+  .tou-section h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #222;
+    margin: 0 0 12px;
+  }
+{% endblock %}
+
+{% block settings_content %}
+
+<div class="tou-header">
+  <h2>Terms of Use</h2>
+  <p class="tou-updated">Last Updated: August 31, 2026</p>
+</div>
+
+<div class="tou-content">
+
+  <div class="tou-section">
+    <p>
+      Welcome to [Insert Application Name] ("Company," "we," "us," or "our"). 
+      These Terms of Use ("Terms") govern your access to and use of our Software-as-a-Service application, APIs, and related services (collectively, the "Service").
+      By creating an account, subscribing, or using the Service, you agree to be bound by these Terms. 
+      If you are entering into these Terms on behalf of an entity (such as your employer or company), you represent that you have the authority to bind that entity.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>1. Account & Subscription Terms</h3><br>
+    <h4>1.1 Account Registration</h4>
+    <p>
+      To access the Service, you must register for an account. 
+      You agree to provide accurate, current, and complete information and to keep your credentials confidential. 
+      You are solely responsible for all activities that occur under your account.
+    </p>
+    <h4>1.2 Subscriptions & Payments</h4>
+    <p>
+      Billing: Payments are processed securely via our third-party payment processor, Stripe. By subscribing, you authorize us and Stripe to charge your designated payment method for recurring subscription fees according to your chosen plan.
+
+      Renewals & Cancellations: Subscriptions automatically renew unless canceled prior to the billing renewal date.
+
+      Refunds: Fees are non-refundable except as required by law or explicitly stated in a separate Service Level Agreement (SLA).
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>2. Permitted Use & Account Restrictions</h3><br>
+    <h4>2.1 License Grant</h4>
+    <p>
+      Subject to these Terms, we grant you a limited, non-exclusive, non-transferable, non-sublicensable license to access and use the Service for your internal business operations (managing stock, order history, invoice history, contacts, recipes, product lists, and journals).
+    </p>
+    <h4>2.2 Prohibited Conduct</h4>
+    <p>
+      You agree not to:
+
+        Reverse engineer, decompile, or attempt to extract the source code of the Service.
+
+        Use the Service to store or transmit unlawful, infringing, or malicious content (including viruses or destructive code).
+
+        Bypass security filters, rate limits, or authentication systems provided by us or our security infrastructure partners.
+
+        Access the Service for the purpose of building a competitive product or service.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>3. Customer Data & Intellectual Property</h3><br>
+    <h4>3.1 Ownership of Customer Data</h4>
+    <p>
+      You retain all ownership rights to the data, recipes, contact details, product lists, financial history, and journals you upload or enter into the Service ("Customer Data"). You grant us a limited, worldwide license to host, transmit, process, and display Customer Data solely as necessary to provide, maintain, and secure the Service.
+    </p>
+    <h4>3.2 Our Intellectual Property</h4>
+    <p>
+      We retain all right, title, and interest in and to the Service, including its core software, user interfaces, branding, proprietary code, and system architecture.
+    </p>
+    <h4>3.3 Data Backups</h4>
+    <p>
+      While we utilize modern database infrastructure (including automated backup protocols), you are responsible for maintaining independent backups of your critical business records, recipes, and invoice data.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>4. Third-Party Integrations & Processing</h3><br>
+    <p>
+      To deliver functionality and maintain security, the Service relies on third-party service providers. By using the Service, you acknowledge and agree that your data may pass through these providers:
+
+        Database & Hosting: Storage and query operations are powered by Supabase (PostgreSQL).
+
+        AI Features: Certain automated processing, text generation, or smart analysis features utilize Groq AI. You acknowledge that AI-generated output is provided "as is" and should be reviewed for accuracy before relying on it for critical business decisions (e.g., inventory planning or recipe adjustments).
+
+        Security & File Inspection: Security scanning, virus detection, and content filtering are assisted by Cloudmersive.
+
+        Edge & Web Security: Traffic distribution, DNS, web application firewall (WAF), and DDoS protection are handled via Cloudflare.
+
+        Payment Processing: Payment details are handled entirely by Stripe. We do not store full credit card numbers or sensitive financial authentication tokens on our servers.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>5. Warranties & Disclaimers</h3><br>
+    <h4>5.1 Service "As Is"</h4>
+    <p>
+      THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS. TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+    </p>
+    <h4>5.2 AI & Data Accuracy Disclaimer</h4>
+    <p>
+      While we strive to provide reliable tooling, we do not guarantee that AI features powered by third-party LLMs will produce error-free results. You remain fully responsible for verifying inventory levels, invoice calculations, tax obligations, and product recipe formulations prior to operational execution.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>6. Limitation of Liability</h3><br>
+    <p>
+      TO THE FULLEST EXTENT PERMITTED BY APPLICABLE LAW:
+      1.    NO INDIRECT DAMAGES: IN NO EVENT SHALL WE BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNATIVE DAMAGES (INCLUDING LOSS OF PROFITS, LOSS OF RECIPES, LOSS OF DATA, OR BUSINESS INTERRUPTION) ARISING OUT OF OR IN CONNECTION WITH THE SERVICE.
+
+      2.    LIABILITY CAP: OUR TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATING TO THESE TERMS OR THE SERVICE SHALL NOT EXCEED THE TOTAL AMOUNT PAID BY YOU TO US FOR THE SERVICE IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>7. Termination</h3><br>
+    <h4>7.1 Termination by You</h4>
+    <p>
+      You may cancel your account at any time via your subscription settings or by contacting support.
+    </p>
+    <h4>7.2 Termination by Us</h4>
+    <p>
+      We reserve the right to suspend or terminate your account if you violate these Terms, fail to pay subscription fees, or if your usage poses a security threat to our platform or other users.
+    </p>
+    <h4>7.3 Data Retrieval Upon Termination</h4>
+    <p>
+      Upon account termination, you will have [e.g., 30 days] to export your Customer Data. After this period, we may permanently delete your stored data from our primary databases and backups.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>8. Governing Law & Dispute Resolution</h3><br>
+    <p>
+      These Terms shall be governed by and construed in accordance with the laws of [Your Jurisdiction / State / Country], without regard to its conflict of law principles. Any legal suit, action, or proceeding arising out of these Terms shall be instituted exclusively in the courts located in [Your City/County/Region].
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>9. Changes to Terms</h3><br>
+    <p>
+      We reserve the right to modify these Terms at any time. We will notify you of material changes via email or through a prominent notice inside the application at least [e.g., 14 days] prior to the effective date of the changes. Continued use of the Service after changes take effect constitutes acceptance of the updated Terms.
+    </p>
+  </div>
+
+  <div class="tou-section">
+    <h3>10. Contact Information</h3><br>
+    <p>
+      If you have any questions regarding these Terms, please contact us at:
+
+        Company Name: [Insert Legal Business Name]
+
+        Email: support@[yourdomain.com]
+
+        Address: [Insert Business Address]
+    </p>
+  </div>
+
+</div>
+{% endblock %}

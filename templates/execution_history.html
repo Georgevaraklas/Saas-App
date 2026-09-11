@@ -1,0 +1,872 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Execution History
+{% endblock %}
+
+{% block styles %}
+  <!-- Use nnorder.css for base table/button styling (same as products.html / recipes.html) -->
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Table styles (matching products.html / recipes.html) --- */
+
+    .history-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .history-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .history-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .history-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .history-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .history-table-wrapper tbody td:last-child {
+      text-align: right;
+    }
+    .history-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .history-table-wrapper tbody tr:hover {
+      background: #fafafa;
+    }
+    .history-table-wrapper .no-history-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    .remove-btn {
+      font-size: 14px;
+      background: #dc3545;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .remove-btn:hover {
+      background: #c82333;
+    }
+    .remove-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .history-oid {
+      color: #666;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 13px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-badge.completed {
+      background: #e6f6ec;
+      color: #1c7a3f;
+    }
+    .status-badge.forced {
+      background: #fff3e0;
+      color: #b8720b;
+    }
+
+    /* --- Top bar (copied from products.html / recipes.html) --- */
+    .inv-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+    .inv-topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-left: auto;
+    }
+
+    .inv-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .inv-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .inv-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .inv-sort-wrap select:focus {
+      border-color: #111;
+    }
+
+    .inv-search-wrap {
+      position: relative;
+      flex: 0 1 320px;
+    }
+    .inv-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .inv-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .inv-search-wrap .inv-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* --- Clickable rows --- */
+    .history-row {
+      cursor: pointer;
+    }
+
+    /* --- Execution detail modal --- */
+    #executionDetailModal .modal-box {
+      width: 720px;
+      max-width: 92vw;
+      max-height: 86vh;
+      overflow-y: auto;
+    }
+    .detail-meta {
+      color: #666;
+      font-size: 13px;
+      margin: -4px 0 18px;
+    }
+    .detail-section-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 18px 0 8px;
+      color: #111;
+    }
+    .detail-section-title:first-of-type {
+      margin-top: 0;
+    }
+    .detail-order-card {
+      background: #f8f8f8;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13.5px;
+      line-height: 1.7;
+    }
+    .detail-empty {
+      color: #999;
+      font-style: italic;
+      font-size: 13.5px;
+      padding: 4px 0 8px;
+    }
+    .detail-products-table-wrap {
+      overflow-x: auto;
+    }
+    .detail-products-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .detail-products-table thead th {
+      text-align: left;
+      padding: 12px 14px;
+      background: #111;
+      color: #fff;
+      font-weight: 600;
+    }
+    .detail-products-table tbody td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .detail-section-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .btn-small {
+      padding: 4px 12px;
+      font-size: 12px;
+    }
+    .btn-order-link {
+      background: #0b1215;
+      color: #fff;
+      border: 1px solid #0b1215;
+    }
+    .btn-order-link:hover {
+      background: #1a2226;
+    }
+
+    /* --- Link Order picker modal --- */
+    #linkOrderModal .modal-box {
+      width: 520px;
+      max-width: 92vw;
+      max-height: 78vh;
+      overflow-y: auto;
+    }
+    .link-order-list {
+      max-height: 340px;
+      overflow-y: auto;
+      border: 1px solid #eee;
+      border-radius: 8px;
+    }
+    .link-order-row {
+      padding: 10px 14px;
+      border-bottom: 1px solid #f0f0f0;
+      cursor: pointer;
+      font-size: 13.5px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .link-order-row:last-child {
+      border-bottom: none;
+    }
+    .link-order-row:hover {
+      background: #fafafa;
+    }
+    .link-order-oid {
+      font-weight: 600;
+    }
+    .link-order-meta {
+      color: #888;
+      font-size: 12px;
+      margin-top: 2px;
+    }
+    .link-order-empty {
+      padding: 24px;
+      text-align: center;
+      color: #999;
+      font-style: italic;
+    }
+
+    /* =======================================================
+       Page shell — matches the redesigned header/card pattern
+       used on the Home, Stock, Order History, Products, and
+       Recipes pages, built on top of layout.html's design
+       system.
+       ======================================================= */
+    .hist-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .hist-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .hist-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .hist-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing sort + search */
+    .hist-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .hist-toolbar-card .inv-topbar {
+      margin-bottom: 0;
+    }
+    .hist-toolbar-card .inv-topbar h2 {
+      display: none; /* replaced by .hist-header h1 above */
+    }
+    .hist-toolbar-card .inv-topbar-actions {
+      margin-left: 0;
+      width: 100%;
+      justify-content: flex-end;
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .hist-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .hist-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .hist-toolbar-card .inv-topbar-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .hist-toolbar-card .inv-search-wrap input {
+        width: 100%;
+      }
+      .hist-toolbar-card,
+      .hist-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+{% set history = history | default([]) %}
+
+<div class="hist-wrap">
+
+  <div class="hist-header">
+    <div>
+      <p class="greeting-eyebrow">Manufacturing</p>
+      <h1>Execution History</h1>
+    </div>
+  </div>
+
+  <div class="hist-toolbar-card">
+    <div class="inv-topbar">
+      <h2>Execution History</h2>
+      <div class="inv-topbar-actions">
+        <div class="inv-sort-wrap">
+          <label for="inv-sort-select">Sort By</label>
+          <select id="inv-sort-select">
+            <option value="date_desc" selected>Date (Newest First)</option>
+            <option value="date_asc">Date (Oldest First)</option>
+            <option value="name_asc">Recipe Name (A–Z)</option>
+            <option value="name_desc">Recipe Name (Z–A)</option>
+            <option value="runs_desc">Runs (High to Low)</option>
+            <option value="runs_asc">Runs (Low to High)</option>
+          </select>
+        </div>
+        <div class="inv-search-wrap">
+          <span class="inv-search-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+            </svg>
+          </span>
+          <input type="text" id="inv-search-input" placeholder="Search history...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hist-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Executions</h2>
+      <span class="section-sub">{{ history|length if history else 0 }} total</span>
+    </div>
+    <div class="history-table-wrapper">
+    <table>
+      <thead>
+        <tr>
+          <th>Recipe name</th>
+          <th>Runs</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th>Operation ID</th>
+          <th></th> <!-- Remove column -->
+        </tr>
+      </thead>
+      <tbody id="historyTableBody">
+        {% if history %}
+          {% for entry in history %}
+            <tr class="history-row" data-history-id="{{ entry['id'] }}" data-name="{{ entry['rname'] }}" data-runs="{{ entry['runs'] }}" data-date="{{ entry['edate'] }}">
+              <td class="history-recipe-name">{{ entry["rname"] }}</td>
+              <td class="history-runs">{{ entry["runs"] }}</td>
+              <td class="history-date">{{ entry["edate"] }}</td>
+              <td>
+                {% if entry["forced"] %}
+                  <span class="status-badge forced">Forced (short stock)</span>
+                {% else %}
+                  <span class="status-badge completed">Completed</span>
+                {% endif %}
+              </td>
+              <td class="history-oid">{{ entry["oid"] }}</td>
+              <td>
+                <button type="button" class="remove-btn" data-history-id="{{ entry['id'] }}">Remove</button>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="no-history-row" id="no-history-row">
+            <td colspan="6">No recipe executions yet.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<!-- Execution Detail Modal -->
+<div class="modal-overlay" id="executionDetailModal">
+  <div class="modal-box" id="executionDetailBox">
+    <h3 id="detailRecipeName">Recipe execution</h3>
+    <p class="detail-meta" id="detailMeta"></p>
+
+    <h4 class="detail-section-title detail-section-title-row">
+      <span>Order</span>
+      <span>
+        <button class="btn-small btn-order-link" id="unlinkOrderBtn" type="button" style="display:none;">Unlink</button>
+        <button class="btn-small btn-order-link" id="linkOrderBtn" type="button">Link Order</button>
+      </span>
+    </h4>
+    <div id="detailOrderWrap"></div>
+
+    <h4 class="detail-section-title">Products used</h4>
+    <div id="detailProductsWrap"></div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" id="closeExecutionDetailBtn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Link Order Picker Modal -->
+<div class="modal-overlay" id="linkOrderModal">
+  <div class="modal-box" id="linkOrderBox">
+    <h3>Link an Order</h3>
+    <div class="inv-search-wrap" style="margin-bottom:12px; flex:1;">
+      <span class="inv-search-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+        </svg>
+      </span>
+      <input type="text" id="linkOrderSearchInput" placeholder="Search orders...">
+    </div>
+    <div id="linkOrderList" class="link-order-list"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" id="cancelLinkOrderBtn" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const historyTableBody = document.getElementById('historyTableBody');
+
+  // ---- Remove history entry ----
+  function deleteHistoryEntry(removeBtn) {
+    const historyId = removeBtn.dataset.historyId;
+
+    if (!confirm('Remove this execution record? This cannot be undone.')) return;
+
+    removeBtn.disabled = true;
+
+    fetch('/delete_execution_history', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history_id: historyId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to delete execution history entry');
+        }
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          const row = historyTableBody.querySelector(`tr[data-history-id="${historyId}"]`);
+          if (row) row.remove();
+          toggleNoHistoryRow();
+        } else {
+          alert('Error: ' + (data.message || 'Could not remove this entry.'));
+          removeBtn.disabled = false;
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while removing this entry.');
+        removeBtn.disabled = false;
+      });
+  }
+
+  historyTableBody.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.remove-btn');
+    if (removeBtn) {
+      deleteHistoryEntry(removeBtn);
+      return;
+    }
+    const row = e.target.closest('.history-row');
+    if (row) {
+      openExecutionDetail(row.dataset.historyId);
+    }
+  });
+
+  // ---- Toggle "no history" row ----
+  function toggleNoHistoryRow() {
+    const hasRows = historyTableBody.querySelectorAll('tr.history-row').length > 0;
+    let noRow = document.getElementById('no-history-row');
+
+    if (!hasRows && !noRow) {
+      noRow = document.createElement('tr');
+      noRow.className = 'no-history-row';
+      noRow.id = 'no-history-row';
+      noRow.innerHTML = '<td colspan="6">No recipe executions yet.</td>';
+      historyTableBody.appendChild(noRow);
+    } else if (hasRows && noRow) {
+      noRow.remove();
+    }
+  }
+
+  // ---- Execution detail modal ----
+  const executionDetailModal = document.getElementById('executionDetailModal');
+  const detailRecipeName = document.getElementById('detailRecipeName');
+  const detailMeta = document.getElementById('detailMeta');
+  const detailOrderWrap = document.getElementById('detailOrderWrap');
+  const detailProductsWrap = document.getElementById('detailProductsWrap');
+  const closeExecutionDetailBtn = document.getElementById('closeExecutionDetailBtn');
+
+  function fmtForced(forced) {
+    return forced ? 'Forced (short stock)' : 'Completed';
+  }
+
+  let currentHistoryId = null;
+
+  async function openExecutionDetail(historyId) {
+    currentHistoryId = historyId;
+    detailRecipeName.textContent = 'Loading…';
+    detailMeta.textContent = '';
+    detailOrderWrap.innerHTML = '';
+    detailProductsWrap.innerHTML = '';
+    unlinkOrderBtn.style.display = 'none';
+    linkOrderBtn.style.display = 'inline-block';
+    executionDetailModal.classList.add('open');
+
+    try {
+      const response = await fetch(`/get_execution_details?history_id=${historyId}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        detailRecipeName.textContent = 'Execution details';
+        detailProductsWrap.innerHTML = `<p class="detail-empty">${data.message || 'Could not load this execution.'}</p>`;
+        return;
+      }
+
+      const ex = data.execution;
+      detailRecipeName.textContent = ex.rname;
+      detailMeta.textContent = `${ex.runs} run(s) · ${ex.edate} · ${fmtForced(ex.forced)} · Operation ${ex.oid}`;
+
+      // Order section
+      if (data.order) {
+        const o = data.order;
+        detailOrderWrap.innerHTML = `
+          <div class="detail-order-card">
+            <div><strong>Order:</strong> #${o.oid}</div>
+            <div><strong>Customer:</strong> ${o.customer_name}</div>
+            <div><strong>Type:</strong> ${o.order_type || '-'}</div>
+            <div><strong>Status:</strong> ${o.pstatus || '-'}</div>
+            <div><strong>Order date:</strong> ${o.rdate || '-'}</div>
+            <div><strong>Expected/delivery date:</strong> ${o.edate || '-'}</div>
+          </div>
+        `;
+        unlinkOrderBtn.style.display = 'inline-block';
+        linkOrderBtn.style.display = 'none';
+      } else {
+        detailOrderWrap.innerHTML = `<p class="detail-empty">This execution was not linked to a specific order.</p>`;
+        unlinkOrderBtn.style.display = 'none';
+        linkOrderBtn.style.display = 'inline-block';
+      }
+
+      // Products section
+      if (data.products && data.products.length > 0) {
+        const rows = data.products.map(p => `
+          <tr>
+            <td>${p.name}</td>
+            <td>${p.quantity}${p.uom ? ' ' + p.uom : ''}</td>
+            <td>${p.lot || '-'}</td>
+            <td>${p.location || '-'}</td>
+            <td>${p.production_date || '-'}</td>
+            <td>${p.expiration_date || '-'}</td>
+          </tr>
+        `).join('');
+        detailProductsWrap.innerHTML = `
+          <div class="detail-products-table-wrap">
+            <table class="detail-products-table">
+              <thead><tr><th>Product</th><th>Quantity used</th><th>Lot</th><th>Location</th><th>Prod. Date</th><th>Exp. Date</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        `;
+      } else {
+        detailProductsWrap.innerHTML = `<p class="detail-empty">Products not traceable</p>`;
+      }
+    } catch (err) {
+      console.error(err);
+      detailRecipeName.textContent = 'Execution details';
+      detailProductsWrap.innerHTML = `<p class="detail-empty">Something went wrong while loading this execution.</p>`;
+    }
+  }
+
+  closeExecutionDetailBtn.addEventListener('click', () => {
+    executionDetailModal.classList.remove('open');
+  });
+  executionDetailModal.addEventListener('click', (e) => {
+    if (e.target === executionDetailModal) executionDetailModal.classList.remove('open');
+  });
+
+  // ---- Link Order ----
+  const linkOrderBtn = document.getElementById('linkOrderBtn');
+  const unlinkOrderBtn = document.getElementById('unlinkOrderBtn');
+  const linkOrderModal = document.getElementById('linkOrderModal');
+  const linkOrderList = document.getElementById('linkOrderList');
+  const linkOrderSearchInput = document.getElementById('linkOrderSearchInput');
+  const cancelLinkOrderBtn = document.getElementById('cancelLinkOrderBtn');
+
+  let allUserOrders = [];
+
+  function renderLinkOrderList(orders) {
+    if (!orders || orders.length === 0) {
+      linkOrderList.innerHTML = '<div class="link-order-empty">No orders found.</div>';
+      return;
+    }
+    linkOrderList.innerHTML = orders.map(o => `
+      <div class="link-order-row" data-oid="${o.oid}">
+        <div>
+          <div class="link-order-oid">#${o.oid} — ${o.customer_name}</div>
+          <div class="link-order-meta">${o.order_type || '-'} · ${o.pstatus || '-'} · ${o.rdate || '-'}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function openLinkOrderModal() {
+    linkOrderSearchInput.value = '';
+    linkOrderList.innerHTML = '<div class="link-order-empty">Loading…</div>';
+    linkOrderModal.classList.add('open');
+
+    try {
+      const response = await fetch('/get_user_orders');
+      const data = await response.json();
+      if (!data.success) {
+        linkOrderList.innerHTML = '<div class="link-order-empty">Could not load orders.</div>';
+        return;
+      }
+      allUserOrders = data.orders || [];
+      renderLinkOrderList(allUserOrders);
+    } catch (err) {
+      console.error(err);
+      linkOrderList.innerHTML = '<div class="link-order-empty">Something went wrong.</div>';
+    }
+  }
+
+  linkOrderBtn.addEventListener('click', () => {
+    if (!currentHistoryId) return;
+    openLinkOrderModal();
+  });
+
+  cancelLinkOrderBtn.addEventListener('click', () => {
+    linkOrderModal.classList.remove('open');
+  });
+  linkOrderModal.addEventListener('click', (e) => {
+    if (e.target === linkOrderModal) linkOrderModal.classList.remove('open');
+  });
+
+  linkOrderSearchInput.addEventListener('input', () => {
+    const term = linkOrderSearchInput.value.trim().toLowerCase();
+    const filtered = !term ? allUserOrders : allUserOrders.filter(o =>
+      String(o.oid).toLowerCase().includes(term) ||
+      (o.customer_name || '').toLowerCase().includes(term)
+    );
+    renderLinkOrderList(filtered);
+  });
+
+  linkOrderList.addEventListener('click', async (e) => {
+    const row = e.target.closest('.link-order-row');
+    if (!row || !currentHistoryId) return;
+
+    const orderId = row.dataset.oid;
+    try {
+      const response = await fetch('/link_execution_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history_id: currentHistoryId, order_id: orderId })
+      });
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.message || 'Could not link this order.');
+        return;
+      }
+      linkOrderModal.classList.remove('open');
+      openExecutionDetail(currentHistoryId);
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while linking this order.');
+    }
+  });
+
+  unlinkOrderBtn.addEventListener('click', async () => {
+    if (!currentHistoryId) return;
+    if (!confirm('Unlink this order from the execution?')) return;
+
+    try {
+      const response = await fetch('/link_execution_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history_id: currentHistoryId, order_id: null })
+      });
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.message || 'Could not unlink this order.');
+        return;
+      }
+      openExecutionDetail(currentHistoryId);
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while unlinking this order.');
+    }
+  });
+
+  // ---- Search / filter ----
+  const searchInput = document.getElementById('inv-search-input');
+
+  function toggleNoSearchResultsRow(show) {
+    let row = document.getElementById('no-search-results-row');
+    if (show && !row) {
+      row = document.createElement('tr');
+      row.className = 'no-history-row';
+      row.id = 'no-search-results-row';
+      row.innerHTML = '<td colspan="6">No matching executions found</td>';
+      historyTableBody.appendChild(row);
+    } else if (!show && row) {
+      row.remove();
+    }
+  }
+
+  function filterHistory() {
+    const term = searchInput.value.trim().toLowerCase();
+    const rows = historyTableBody.querySelectorAll('tr.history-row');
+
+    if (rows.length === 0) {
+      toggleNoSearchResultsRow(false);
+      return;
+    }
+
+    let anyVisible = false;
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+      if (matches) anyVisible = true;
+    });
+
+    toggleNoSearchResultsRow(!anyVisible);
+  }
+
+  searchInput.addEventListener('input', filterHistory);
+
+  // ---- Sort dropdown (defaults to Date - Newest First) ----
+  const invSortSelect = document.getElementById('inv-sort-select');
+
+  function sortHistoryRows() {
+    const sortValue = invSortSelect.value || 'date_desc';
+    const rows = Array.from(historyTableBody.querySelectorAll('tr.history-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'name_asc' || sortValue === 'name_desc') {
+        const nameA = (a.dataset.name || '').toLowerCase();
+        const nameB = (b.dataset.name || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortValue === 'name_asc' ? cmp : -cmp;
+      } else if (sortValue === 'runs_asc' || sortValue === 'runs_desc') {
+        const runsA = parseFloat(a.dataset.runs) || 0;
+        const runsB = parseFloat(b.dataset.runs) || 0;
+        return sortValue === 'runs_asc' ? runsA - runsB : runsB - runsA;
+      } else {
+        const timeA = Date.parse(a.dataset.date) || 0;
+        const timeB = Date.parse(b.dataset.date) || 0;
+        return sortValue === 'date_asc' ? timeA - timeB : timeB - timeA;
+      }
+    });
+
+    rows.forEach(row => historyTableBody.appendChild(row));
+  }
+
+  invSortSelect.addEventListener('change', sortHistoryRows);
+
+  // Apply the default sort (Date - Newest First) as soon as the page loads
+  sortHistoryRows();
+</script>
+
+{% endblock %}

@@ -1,0 +1,1174 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Reports
+{% endblock %}
+
+{% block styles %}
+  <link href="/static/nnorder.css" rel="stylesheet">
+  <style>
+    /* --- Extra styles for the Reports page --- */
+
+    .page.rpt-page {
+      max-width: none;
+      width: 100%;
+      margin: 0;
+      box-sizing: border-box;
+    }
+
+    .rpt-topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 6px;
+    }
+
+    .rpt-topbar h2 {
+      margin: 0 0 4px;
+    }
+
+    .rpt-subtitle {
+      color: #888;
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .rpt-search-wrap {
+      position: relative;
+      flex: 0 1 300px;
+    }
+    .rpt-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .rpt-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .rpt-search-wrap .rpt-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    /* --- Category sections --- */
+    .rpt-category {
+      margin-top: 34px;
+    }
+    .rpt-category:first-of-type {
+      margin-top: 22px;
+    }
+
+    .rpt-category-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .rpt-category-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: #111;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .rpt-category-icon svg { width: 18px; height: 18px; }
+
+    .rpt-category-head h3 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: #111;
+    }
+
+    .rpt-category-head .rpt-category-sub {
+      margin: 0;
+      font-size: 12.5px;
+      color: #999;
+    }
+
+    .rpt-category-head-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    /* --- Report cards --- */
+    .rpt-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .rpt-card {
+      background: #fff;
+      border: 1px solid #eee;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+      padding: 20px;
+      cursor: pointer;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rpt-card:hover {
+      box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+      border-color: #ddd;
+      transform: translateY(-1px);
+    }
+
+    .rpt-card.active {
+      border-color: #111;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+    }
+
+    .rpt-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .rpt-card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #f2f2f2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #111;
+    }
+    .rpt-card-icon svg { width: 18px; height: 18px; }
+
+    .rpt-card-arrow {
+      color: #bbb;
+      font-size: 18px;
+      transition: transform 0.15s ease, color 0.15s ease;
+    }
+    .rpt-card:hover .rpt-card-arrow {
+      color: #111;
+      transform: translateX(2px);
+    }
+
+    .rpt-card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #111;
+    }
+
+    .rpt-card-desc {
+      font-size: 13px;
+      color: #888;
+      line-height: 1.4;
+    }
+
+    .rpt-card-tag {
+      display: inline-block;
+      align-self: flex-start;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: #eef1ff;
+      color: #3547d1;
+    }
+    .rpt-card-tag.warn {
+      background: #fdecec;
+      color: #c0392b;
+    }
+    .rpt-card-tag.neutral {
+      background: #f2f2f2;
+      color: #555;
+    }
+
+    /* --- Report viewer (popup modal, centered on screen) --- */
+    .rpt-viewer {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+    .rpt-viewer.open {
+      display: flex;
+    }
+
+    .rpt-viewer-box {
+      width: 100%;
+      max-width: 1400px;
+      max-height: 85vh;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .rpt-viewer-head {
+      background: #111;
+      color: #fff;
+      padding: 20px 26px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+
+    .rpt-viewer-head-text h4 {
+      margin: 0 0 2px;
+      font-size: 17px;
+    }
+    .rpt-viewer-head-text span {
+      font-size: 12.5px;
+      color: #bbb;
+    }
+
+    .rpt-viewer-head-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .rpt-viewer-edit {
+      background: transparent;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .rpt-viewer-edit:hover { background: #222; }
+
+    .rpt-viewer-close {
+      background: transparent;
+      border: 1px solid #444;
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .rpt-viewer-close:hover { background: #222; }
+
+    .rpt-viewer-meta {
+      padding: 14px 26px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      gap: 22px;
+      flex-wrap: wrap;
+      background: #fafafa;
+      flex-shrink: 0;
+    }
+    .rpt-viewer-meta .meta-item {
+      font-size: 12.5px;
+      color: #666;
+    }
+    .rpt-viewer-meta .meta-item strong {
+      color: #111;
+      font-weight: 700;
+    }
+
+    .rpt-viewer-body {
+      padding: 24px 26px 30px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .rpt-table-wrapper {
+      width: 100%;
+      border-radius: 10px;
+      overflow-x: auto;
+      border: 1px solid #eee;
+    }
+    .rpt-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .rpt-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .rpt-table-wrapper thead th {
+      text-align: left;
+      padding: 14px 20px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .rpt-table-wrapper tbody td {
+      padding: 14px 20px;
+      font-size: 14px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .rpt-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .rpt-table-wrapper tbody tr:hover {
+      background: #fafafa;
+    }
+    .rpt-table-wrapper .empty-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 40px;
+    }
+
+    .rpt-viewer-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 50px 20px;
+      color: #999;
+    }
+    .rpt-viewer-placeholder svg {
+      width: 40px;
+      height: 40px;
+      color: #ccc;
+      margin-bottom: 12px;
+    }
+    .rpt-viewer-placeholder p {
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .rpt-empty-search {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 40px;
+    }
+
+    /* --- Filter modal (reuses modal-overlay / modal-box from nnorder.css) --- */
+    /* Higher than .rpt-viewer's z-index so it stacks in front when opened
+       via "Edit Filters" while the report viewer is already open. */
+    #rpt-filter-overlay {
+      z-index: 1100;
+    }
+
+    .modal-box.rpt-modal-box {
+      width: 520px;
+      max-width: 90vw;
+    }
+
+    .rpt-modal-box .form-section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #888;
+      font-weight: 700;
+      margin: 22px 0 12px;
+    }
+    .rpt-modal-box .form-section-title:first-of-type {
+      margin-top: 4px;
+    }
+
+    .rpt-modal-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+    .rpt-modal-field label {
+      font-size: 12.5px;
+      color: #888;
+      font-weight: 600;
+    }
+    .rpt-modal-field select,
+    .rpt-modal-field input[type="date"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      color: #111;
+    }
+
+    .rpt-modal-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .rpt-order-toggle {
+      display: flex;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .rpt-order-toggle button {
+      flex: 1;
+      padding: 10px 12px;
+      background: #fff;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .rpt-order-toggle button + button {
+      border-left: 1px solid #ddd;
+    }
+    .rpt-order-toggle button.active {
+      background: #111;
+      color: #fff;
+    }
+
+    .rpt-modal-box .modal-actions {
+      margin-top: 6px;
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="page rpt-page">
+
+  <br><br>
+
+  <div class="rpt-topbar">
+    <div>
+      <h2>Reports</h2>
+      <p class="rpt-subtitle">Generate and export reports for your company's activity.</p>
+    </div>
+    <div class="rpt-search-wrap">
+      <span class="rpt-search-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
+        </svg>
+      </span>
+      <input type="text" id="rpt-search-input" placeholder="Search reports...">
+    </div>
+  </div>
+
+  <div id="rpt-categories">
+
+    <!-- Sales & Orders -->
+    <div class="rpt-category" data-category="sales">
+      <div class="rpt-category-head">
+        <div class="rpt-category-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18M3 3v18h18V3M8 21V9m4 12V13m4 8V6"/></svg>
+        </div>
+        <div class="rpt-category-head-text">
+          <h3>Sales &amp; Orders</h3>
+          <p class="rpt-category-sub">Orders and invoices issued to customers</p>
+        </div>
+      </div>
+      <div class="rpt-grid">
+
+        <div class="rpt-card" data-report="orders" data-title="Orders Report" data-desc="All customer orders in a given period, by status and value." data-sort-group="orders">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Orders Report</div>
+          <div class="rpt-card-desc">All orders placed within a period, filterable by customer and status.</div>
+          <span class="rpt-card-tag neutral">Sales</span>
+        </div>
+
+        <div class="rpt-card" data-report="invoices" data-title="Invoices Report" data-desc="Every invoice issued, with totals, tax and payment status." data-sort-group="invoices">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Invoices Report</div>
+          <div class="rpt-card-desc">Issued invoices with totals, tax breakdown and payment status.</div>
+          <span class="rpt-card-tag neutral">Sales</span>
+        </div>
+
+        <div class="rpt-card" data-report="sales_invoices" data-title="Sales Invoice Report" data-desc="Invoices issued to customers, with totals and payment status." data-sort-group="invoices">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3M3.75 19.5h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Sales Invoice Report</div>
+          <div class="rpt-card-desc">Invoices issued to customers, by date, contact and amount.</div>
+          <span class="rpt-card-tag neutral">Sales</span>
+        </div>
+
+        <div class="rpt-card" data-report="purchase_invoices" data-title="Purchase Invoice Report" data-desc="Invoices received from suppliers, with totals and payment status." data-sort-group="invoices">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM14.25 12h.008v.008h-.008V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Purchase Invoice Report</div>
+          <div class="rpt-card-desc">Invoices received from suppliers, by date, contact and amount.</div>
+          <span class="rpt-card-tag neutral">Sales</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Purchasing & Payables -->
+    <div class="rpt-category" data-category="purchasing">
+      <div class="rpt-category-head">
+        <div class="rpt-category-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2z"/></svg>
+        </div>
+        <div class="rpt-category-head-text">
+          <h3>Purchasing &amp; Payables</h3>
+          <p class="rpt-category-sub">What you owe, and what's owed to you</p>
+        </div>
+      </div>
+      <div class="rpt-grid">
+
+        <div class="rpt-card" data-report="payable_orders" data-title="Payable Orders Report" data-desc="Purchase orders that are due or approaching their due date." data-sort-group="orders">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h2m8-10h4a2 2 0 012 2v8a2 2 0 01-2 2H9m8-12l-4-4m0 0l-4 4m4-4v12"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Payable Orders Report</div>
+          <div class="rpt-card-desc">Purchase orders due or coming due, by supplier.</div>
+          <span class="rpt-card-tag neutral">Purchasing</span>
+        </div>
+
+        <div class="rpt-card" data-report="unpaid_orders" data-title="Unpaid Orders Report" data-desc="Orders that are still awaiting payment." data-sort-group="orders">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Unpaid Orders Report</div>
+          <div class="rpt-card-desc">Orders that have not yet been paid, sorted by age.</div>
+          <span class="rpt-card-tag warn">Outstanding</span>
+        </div>
+
+        <div class="rpt-card" data-report="unpaid_customers" data-title="Unpaid Customer Report" data-desc="Customers with an outstanding balance, grouped by account." data-sort-group="contacts">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Unpaid Customer Report</div>
+          <div class="rpt-card-desc">Customers with an open balance, totalled per account.</div>
+          <span class="rpt-card-tag warn">Outstanding</span>
+        </div>
+
+        <div class="rpt-card" data-report="unpaid_suppliers" data-title="Unpaid Supplier Report" data-desc="Suppliers you still owe money to, grouped by account." data-sort-group="contacts">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4m16 0l-4-4m4 4l-4 4M4 12l4-4m-4 4l4 4"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Unpaid Supplier Report</div>
+          <div class="rpt-card-desc">Suppliers with an open balance, totalled per account.</div>
+          <span class="rpt-card-tag warn">Outstanding</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Inventory & Production -->
+    <div class="rpt-category" data-category="inventory">
+      <div class="rpt-category-head">
+        <div class="rpt-category-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        </div>
+        <div class="rpt-category-head-text">
+          <h3>Inventory &amp; Production</h3>
+          <p class="rpt-category-sub">Products, stock levels and recipes</p>
+        </div>
+      </div>
+      <div class="rpt-grid">
+
+        <div class="rpt-card" data-report="items" data-title="Items Report" data-desc="Full product catalog with pricing, tax and unit of measure." data-sort-group="items">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375C2.754 3.75 2.25 4.254 2.25 4.875v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Items Report</div>
+          <div class="rpt-card-desc">Your product catalog, with price, tax rate and unit of measure.</div>
+          <span class="rpt-card-tag neutral">Inventory</span>
+        </div>
+
+        <div class="rpt-card" data-report="inventory" data-title="Inventory Report" data-desc="Current stock on hand across all products." data-sort-group="inventory">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20 13V7a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 7v10a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0020 17v-1M12 22V12M2 7l10 5 10-5"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Inventory Report</div>
+          <div class="rpt-card-desc">Current stock levels, with low-stock items flagged.</div>
+          <span class="rpt-card-tag neutral">Inventory</span>
+        </div>
+
+        <div class="rpt-card" data-report="recipes" data-title="Recipes Report" data-desc="Recipes with their ingredients, outputs and yield." data-sort-group="recipes">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 3v2m6-2v2M5 8h14M5 8a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2v-9a2 2 0 00-2-2M5 8l2.5 3M19 8l-2.5 3"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Recipes Report</div>
+          <div class="rpt-card-desc">Every recipe with its ingredients, outputs and yield.</div>
+          <span class="rpt-card-tag neutral">Inventory</span>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Contacts -->
+    <div class="rpt-category" data-category="contacts">
+      <div class="rpt-category-head">
+        <div class="rpt-category-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m5-3a4 4 0 100-8 4 4 0 000 8zm6 3.13a4 4 0 010 7.75M7 8.13a4 4 0 000 7.75"/></svg>
+        </div>
+        <div class="rpt-category-head-text">
+          <h3>Contacts</h3>
+          <p class="rpt-category-sub">Suppliers and customers on file</p>
+        </div>
+      </div>
+      <div class="rpt-grid">
+
+        <div class="rpt-card" data-report="suppliers" data-title="Suppliers Report" data-desc="All suppliers on file, with type and activity." data-sort-group="contacts">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Suppliers Report</div>
+          <div class="rpt-card-desc">All suppliers on file, with type and activity.</div>
+          <span class="rpt-card-tag neutral">Contacts</span>
+        </div>
+
+        <div class="rpt-card" data-report="customers" data-title="Customers Report" data-desc="All customers on file, with type and activity." data-sort-group="contacts">
+          <div class="rpt-card-top">
+            <div class="rpt-card-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <span class="rpt-card-arrow">&rarr;</span>
+          </div>
+          <div class="rpt-card-title">Customers Report</div>
+          <div class="rpt-card-desc">All customers on file, with type and activity.</div>
+          <span class="rpt-card-tag neutral">Contacts</span>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <p class="rpt-empty-search" id="rpt-empty-search" style="display:none;">No reports match your search.</p>
+
+  <!-- Report viewer panel -->
+  <div class="rpt-viewer" id="rpt-viewer">
+    <div class="rpt-viewer-box">
+      <div class="rpt-viewer-head">
+        <div class="rpt-viewer-head-text">
+          <h4 id="rpt-viewer-title">Report</h4>
+          <span id="rpt-viewer-desc">Description</span>
+        </div>
+        <div class="rpt-viewer-head-actions">
+          <button type="button" class="rpt-viewer-edit" id="rpt-viewer-edit">Edit Filters</button>
+          <button type="button" class="rpt-viewer-close" id="rpt-viewer-close">&times;</button>
+        </div>
+      </div>
+
+      <div class="rpt-viewer-meta" id="rpt-viewer-meta">
+        <!-- filled in by JS: sort by / order / period / export -->
+      </div>
+
+      <div class="rpt-viewer-body" id="rpt-viewer-body">
+        <div class="rpt-viewer-placeholder">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
+          <p>Generating your report...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Filter modal -->
+<div class="modal-overlay" id="rpt-filter-overlay">
+  <div class="modal-box rpt-modal-box">
+    <h3 id="rpt-modal-title">Report</h3>
+
+    <h4 class="form-section-title">Sort</h4>
+    <div class="rpt-modal-row">
+      <div class="rpt-modal-field">
+        <label for="rpt-sort-by">Sort By</label>
+        <select id="rpt-sort-by"></select>
+      </div>
+      <div class="rpt-modal-field">
+        <label>Order</label>
+        <div class="rpt-order-toggle">
+          <button type="button" class="active" id="rpt-order-asc" data-order="asc">Ascending</button>
+          <button type="button" id="rpt-order-desc" data-order="desc">Descending</button>
+        </div>
+      </div>
+    </div>
+
+    <h4 class="form-section-title">Time Period</h4>
+    <div class="rpt-modal-row">
+      <div class="rpt-modal-field">
+        <label for="rpt-from-select">From</label>
+        <select id="rpt-from-select">
+          <option value="last_year">Last Year</option>
+          <option value="last_month">Last Month</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      <div class="rpt-modal-field">
+        <label for="rpt-to-select">To</label>
+        <select id="rpt-to-select">
+          <option value="today">Today</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+    </div>
+    <div class="rpt-modal-row">
+      <div class="rpt-modal-field" id="rpt-from-date-wrap" style="display:none;">
+        <label for="rpt-from-date">From date</label>
+        <input type="date" id="rpt-from-date">
+      </div>
+      <div class="rpt-modal-field" id="rpt-to-date-wrap" style="display:none;">
+        <label for="rpt-to-date">To date</label>
+        <input type="date" id="rpt-to-date">
+      </div>
+    </div>
+
+    <h4 class="form-section-title">Export</h4>
+    <div class="rpt-modal-field">
+      <label for="rpt-format">Export as</label>
+      <select id="rpt-format">
+        <option value="view">View on screen</option>
+        <option value="csv">CSV</option>
+        <option value="excel">Excel</option>
+        <option value="pdf">PDF</option>
+        <option value="chart">Chart</option>
+      </select>
+    </div>
+
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" id="rpt-modal-cancel">Cancel</button>
+      <button type="button" class="btn-primary" id="rpt-modal-generate">Generate Report</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    // Account's chosen currency (ISO code), passed from the server.
+    // Falls back to USD if the account/currency isn't set for any reason.
+    const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
+
+    // Mirrors the symbol set in currency_filter.py - keep the two in sync.
+    // Only currencies with a widely-recognized, unambiguous symbol are
+    // listed; everything else falls back to its 3-letter ISO code.
+    const CURRENCY_SYMBOLS = {
+      USD: '$', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥', CHF: 'CHF',
+      INR: '₹', KRW: '₩', VND: '₫', TRY: '₺', ILS: '₪', THB: '฿', PHP: '₱'
+    };
+
+    function formatMoney(value) {
+      const num = parseFloat(value);
+      const amount = isNaN(num) ? 0 : num;
+      const formattedNumber = amount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      const label = CURRENCY_SYMBOLS[accountCurrency] || accountCurrency;
+      return `${formattedNumber} ${label}`;
+    }
+
+    // ---- Sort options per report family ----
+    const SORT_OPTIONS = {
+      items: [
+        { value: 'alpha', label: 'Alphabetically' },
+        { value: 'quantity', label: 'Quantity' },
+        { value: 'selling_price', label: 'Selling Price' },
+        { value: 'purchase_price', label: 'Purchase Price' },
+        { value: 'total_sold', label: 'Total Sold' }
+      ],
+      inventory: [
+        { value: 'alpha', label: 'Alphabetically' },
+        { value: 'quantity', label: 'Quantity' },
+        { value: 'selling_price', label: 'Selling Price' },
+        { value: 'purchase_price', label: 'Purchase Price' }
+      ],
+      contacts: [
+        { value: 'alpha', label: 'Alphabetically' },
+        { value: 'balance', label: 'Balance' },
+        { value: 'unpaid_balance', label: 'Unpaid Balance' }
+      ],
+      invoices: [
+        { value: 'date', label: 'Date' },
+        { value: 'contact_alpha', label: 'Contact (Alphabetically)' },
+        { value: 'salesperson_alpha', label: 'Salesperson (Alphabetically)' },
+        { value: 'amount', label: 'Amount (Total)' }
+      ],
+      // Orders/unpaid orders/payable orders follow the same shape as invoices
+      // (date, contact, salesperson, total amount) since they weren't called
+      // out separately -- adjust here if they should differ.
+      orders: [
+        { value: 'date', label: 'Date' },
+        { value: 'contact_alpha', label: 'Contact (Alphabetically)' },
+        { value: 'salesperson_alpha', label: 'Salesperson (Alphabetically)' },
+        { value: 'amount', label: 'Amount (Total)' }
+      ],
+      recipes: [
+        { value: 'alpha', label: 'Alphabetically' },
+        { value: 'price', label: 'Price' },
+        { value: 'cost', label: 'Cost' },
+        { value: 'runs', label: 'Runs' }
+      ]
+    };
+
+    const cards = Array.from(document.querySelectorAll('.rpt-card'));
+    const viewer = document.getElementById('rpt-viewer');
+    const viewerTitle = document.getElementById('rpt-viewer-title');
+    const viewerDesc = document.getElementById('rpt-viewer-desc');
+    const viewerMeta = document.getElementById('rpt-viewer-meta');
+    const viewerBody = document.getElementById('rpt-viewer-body');
+    const viewerClose = document.getElementById('rpt-viewer-close');
+    const viewerEdit = document.getElementById('rpt-viewer-edit');
+
+    const overlay = document.getElementById('rpt-filter-overlay');
+    const modalTitle = document.getElementById('rpt-modal-title');
+    const sortBySelect = document.getElementById('rpt-sort-by');
+    const orderAscBtn = document.getElementById('rpt-order-asc');
+    const orderDescBtn = document.getElementById('rpt-order-desc');
+    const fromSelect = document.getElementById('rpt-from-select');
+    const toSelect = document.getElementById('rpt-to-select');
+    const fromDateWrap = document.getElementById('rpt-from-date-wrap');
+    const toDateWrap = document.getElementById('rpt-to-date-wrap');
+    const fromDateInput = document.getElementById('rpt-from-date');
+    const toDateInput = document.getElementById('rpt-to-date');
+    const formatSelect = document.getElementById('rpt-format');
+    const modalCancel = document.getElementById('rpt-modal-cancel');
+    const modalGenerate = document.getElementById('rpt-modal-generate');
+
+    let activeCard = null;
+    let currentOrder = 'asc';
+
+    // Today's date, used as the max for both custom date pickers.
+    const todayStr = new Date().toISOString().split('T')[0];
+    fromDateInput.max = todayStr;
+    toDateInput.max = todayStr;
+
+    function populateSortOptions(sortGroup) {
+      const options = SORT_OPTIONS[sortGroup] || SORT_OPTIONS.contacts;
+      sortBySelect.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    }
+
+    function setOrder(order) {
+      currentOrder = order;
+      orderAscBtn.classList.toggle('active', order === 'asc');
+      orderDescBtn.classList.toggle('active', order === 'desc');
+    }
+
+    function toggleCustomDateFields() {
+      fromDateWrap.style.display = fromSelect.value === 'custom' ? 'flex' : 'none';
+      toDateWrap.style.display = toSelect.value === 'custom' ? 'flex' : 'none';
+    }
+
+    fromSelect.addEventListener('change', toggleCustomDateFields);
+    toSelect.addEventListener('change', toggleCustomDateFields);
+    orderAscBtn.addEventListener('click', () => setOrder('asc'));
+    orderDescBtn.addEventListener('click', () => setOrder('desc'));
+
+    function openModal(card) {
+      activeCard = card;
+      cards.forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+
+      modalTitle.textContent = card.dataset.title;
+      populateSortOptions(card.dataset.sortGroup);
+      setOrder('asc');
+      fromSelect.value = 'last_month';
+      toSelect.value = 'today';
+      fromDateInput.value = '';
+      toDateInput.value = '';
+      formatSelect.value = 'view';
+      toggleCustomDateFields();
+
+      overlay.classList.add('open');
+    }
+
+    function closeModal() {
+      overlay.classList.remove('open');
+    }
+
+    cards.forEach(card => {
+      card.addEventListener('click', () => openModal(card));
+    });
+
+    modalCancel.addEventListener('click', () => {
+      closeModal();
+      if (!viewer.classList.contains('open')) {
+        cards.forEach(c => c.classList.remove('active'));
+        activeCard = null;
+      }
+    });
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) modalCancel.click();
+    });
+
+    function fromLabel() {
+      if (fromSelect.value === 'last_year') return 'Last Year';
+      if (fromSelect.value === 'last_month') return 'Last Month';
+      return fromDateInput.value || 'Custom date';
+    }
+    function toLabel() {
+      if (toSelect.value === 'today') return 'Today';
+      return toDateInput.value || 'Custom date';
+    }
+
+    modalGenerate.addEventListener('click', () => {
+      if (!activeCard) return;
+
+      if (fromSelect.value === 'custom' && !fromDateInput.value) {
+        alert('Please choose a "From" date.');
+        return;
+      }
+      if (toSelect.value === 'custom' && !toDateInput.value) {
+        alert('Please choose a "To" date.');
+        return;
+      }
+
+      const sortLabel = sortBySelect.options[sortBySelect.selectedIndex].text;
+      const orderLabel = currentOrder === 'asc' ? 'Ascending' : 'Descending';
+      const formatLabel = formatSelect.options[formatSelect.selectedIndex].text;
+
+      viewerTitle.textContent = activeCard.dataset.title;
+      viewerDesc.textContent = activeCard.dataset.desc;
+      viewerMeta.innerHTML = `
+        <span class="meta-item">Sorted by <strong>${sortLabel}</strong> (${orderLabel})</span>
+        <span class="meta-item">Period: <strong>${fromLabel()}</strong> &rarr; <strong>${toLabel()}</strong></span>
+        <span class="meta-item">Output: <strong>${formatLabel}</strong></span>
+      `;
+
+      viewerBody.innerHTML = `
+        <div class="rpt-viewer-placeholder">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/></svg>
+          <p>Generating your report...</p>
+        </div>
+      `;
+
+      closeModal();
+      viewer.classList.add('open');
+
+      const reportType = activeCard.dataset.report;
+      const format = formatSelect.value;
+      const payload = {
+        sort_by: sortBySelect.value,
+        order: currentOrder,
+        from: fromSelect.value === 'custom' ? fromDateInput.value : fromSelect.value,
+        to: toSelect.value === 'custom' ? toDateInput.value : toSelect.value,
+        format: format
+      };
+
+      fetch(`/reports/${reportType}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(async (res) => {
+          // File downloads (csv/excel/pdf) come back as a binary blob, not JSON.
+          if (format === 'csv' || format === 'excel' || format === 'pdf') {
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              throw new Error(err.message || `Export failed (${res.status})`);
+            }
+            const blob = await res.blob();
+            const ext = format === 'excel' ? 'xlsx' : format;
+            const filename = `${activeCard.dataset.title.replace(/\s+/g, '_')}.${ext}`;
+            triggerBlobDownload(blob, filename);
+
+            viewerBody.innerHTML = `
+              <div class="rpt-viewer-placeholder">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                <p>Your file has downloaded. Open it from your browser's downloads.</p>
+              </div>
+            `;
+            return;
+          }
+
+          const data = await res.json();
+          if (!data.success) {
+            throw new Error(data.message || 'Failed to generate report.');
+          }
+          renderReportTable(data.columns, data.rows);
+        })
+        .catch((err) => {
+          viewerBody.innerHTML = `
+            <div class="rpt-viewer-placeholder">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+              <p>${err.message || 'Something went wrong generating this report.'}</p>
+            </div>
+          `;
+        });
+    });
+
+    // Renders a dynamic table from whatever columns/rows the backend returns
+    // for the current report type -- no hardcoded column set.
+    function renderReportTable(columns, rows) {
+      const theadRow = columns.map(c => `<th>${c}</th>`).join('');
+
+      if (!rows || rows.length === 0) {
+        viewerBody.innerHTML = `
+          <div class="rpt-table-wrapper">
+            <table>
+              <thead><tr>${theadRow}</tr></thead>
+              <tbody>
+                <tr class="empty-row">
+                  <td colspan="${columns.length}">No data returned for this range.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        `;
+        return;
+      }
+
+      const bodyRows = rows.map(row => {
+        // Rows now come back as plain arrays in the same order as `columns`
+        // (not objects -- Flask's jsonify() alphabetically sorts dict keys,
+        // which used to scramble column alignment; arrays are never reordered).
+        const cells = row.map((val, i) => `<td>${formatCellValue(columns[i], val)}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      }).join('');
+
+      viewerBody.innerHTML = `
+        <div class="rpt-table-wrapper">
+          <table>
+            <thead><tr>${theadRow}</tr></thead>
+            <tbody>${bodyRows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Light display formatting: blank nulls, turn epoch-second date columns
+    // into readable dates, format money-like columns with the account's
+    // currency, round any other floats to 2 decimals.
+    function formatCellValue(columnLabel, value) {
+      if (value === null || value === undefined || value === '') return '—';
+      const isDateCol = /date/i.test(columnLabel) || columnLabel === 'Last Invoice';
+      if (isDateCol && typeof value === 'number') {
+        return new Date(value * 1000).toLocaleDateString();
+      }
+      // Column names that indicate a monetary value, e.g. "Selling Price",
+      // "Revenue", "Amount (Total)", "Cost". Matched loosely by name since
+      // report columns are generated dynamically on the backend. Columns
+      // that are counts rather than money (e.g. "Total Sold" = units, not
+      // currency) are explicitly excluded so "total"/"sold" alone doesn't
+      // false-positive.
+      const isQuantityCol = /sold|quantity|qty|count|runs/i.test(columnLabel);
+      const isMoneyCol = !isQuantityCol && /price|revenue|amount|cost|subtotal|balance|spend|total/i.test(columnLabel);
+      if (isMoneyCol && typeof value === 'number') {
+        return formatMoney(value);
+      }
+      if (typeof value === 'number' && !Number.isInteger(value)) {
+        return value.toFixed(2);
+      }
+      return value;
+    }
+
+    function triggerBlobDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    viewerEdit.addEventListener('click', () => {
+      if (activeCard) openModal(activeCard);
+    });
+
+    function closeViewer() {
+      viewer.classList.remove('open');
+      cards.forEach(c => c.classList.remove('active'));
+      activeCard = null;
+    }
+
+    viewerClose.addEventListener('click', closeViewer);
+
+    // Click on the dimmed backdrop (outside the box) closes the viewer, same
+    // as the filter modal.
+    viewer.addEventListener('click', (e) => {
+      if (e.target === viewer) closeViewer();
+    });
+
+    // ---- Search / filter across categories ----
+    const searchInput = document.getElementById('rpt-search-input');
+    const categories = Array.from(document.querySelectorAll('.rpt-category'));
+    const emptySearch = document.getElementById('rpt-empty-search');
+
+    searchInput.addEventListener('input', () => {
+      const term = searchInput.value.trim().toLowerCase();
+      let anyVisible = false;
+
+      categories.forEach(cat => {
+        let catHasVisible = false;
+        cat.querySelectorAll('.rpt-card').forEach(card => {
+          const matches = !term || card.textContent.toLowerCase().includes(term);
+          card.style.display = matches ? '' : 'none';
+          if (matches) catHasVisible = true;
+        });
+        cat.style.display = catHasVisible ? '' : 'none';
+        if (catHasVisible) anyVisible = true;
+      });
+
+      emptySearch.style.display = anyVisible ? 'none' : 'block';
+    });
+  })();
+</script>
+
+{% endblock %}

@@ -1,0 +1,305 @@
+{% extends "settings_base.html" %}
+
+{% block settings_title %}Language - Currency{% endblock %}
+
+{% block settings_styles %}
+  /* ---- Language / Currency page ---- */
+  .lc-header {
+    margin-bottom: 28px;
+  }
+  .lc-header h2 {
+    margin: 0 0 4px;
+  }
+  .lc-header .lc-subtitle {
+    margin: 0;
+    color: #888;
+    font-size: 14px;
+  }
+
+  .lc-form {
+    max-width: 480px;
+  }
+
+  .lc-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 22px;
+  }
+  .lc-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+  }
+  .lc-field .lc-hint {
+    font-size: 11px;
+    color: #aaa;
+  }
+
+  .lc-select-wrap {
+    position: relative;
+  }
+  .lc-select {
+    width: 100%;
+    padding: 10px 36px 10px 12px;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #222;
+    background: #fff;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    cursor: pointer;
+  }
+  .lc-select:focus {
+    outline: none;
+    border-color: #2952e3;
+    box-shadow: 0 0 0 3px rgba(41, 82, 227, 0.12);
+  }
+  .lc-select-wrap::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #888;
+    border-bottom: 2px solid #888;
+    transform: translateY(-65%) rotate(45deg);
+    pointer-events: none;
+  }
+
+  .lc-actions {
+    display: none;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 8px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+  }
+  .lc-actions.lc-visible {
+    display: flex;
+  }
+  .lc-btn {
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .lc-btn-secondary {
+    background: #fff;
+    border-color: #dcdcdc;
+    color: #444;
+  }
+  .lc-btn-secondary:hover {
+    background: #f7f7f7;
+  }
+  .lc-btn-primary {
+    background: #2952e3;
+    color: #fff;
+  }
+  .lc-btn-primary:hover {
+    background: #1f42c2;
+  }
+
+  @media (max-width: 560px) {
+    .lc-form {
+      max-width: 100%;
+    }
+  }
+{% endblock %}
+
+{% block settings_content %}
+{% set current_language = current_language|default('en') %}
+{% set current_currency = (account.currency if account and account.currency else 'USD') %}
+
+{% set languages = [
+  ('en', 'English'),
+  ('es', 'Spanish'),
+  ('fr', 'French'),
+  ('de', 'German'),
+  ('it', 'Italian'),
+  ('pt', 'Portuguese'),
+  ('nl', 'Dutch'),
+  ('el', 'Greek'),
+  ('ru', 'Russian'),
+  ('uk', 'Ukrainian'),
+  ('pl', 'Polish'),
+  ('cs', 'Czech'),
+  ('sk', 'Slovak'),
+  ('hu', 'Hungarian'),
+  ('ro', 'Romanian'),
+  ('bg', 'Bulgarian'),
+  ('sr', 'Serbian'),
+  ('hr', 'Croatian'),
+  ('sl', 'Slovenian'),
+  ('lt', 'Lithuanian'),
+  ('lv', 'Latvian'),
+  ('et', 'Estonian'),
+  ('tr', 'Turkish'),
+  ('sv', 'Swedish'),
+  ('no', 'Norwegian'),
+  ('da', 'Danish'),
+  ('fi', 'Finnish'),
+  ('is', 'Icelandic'),
+  ('ar', 'Arabic'),
+  ('he', 'Hebrew'),
+  ('fa', 'Persian (Farsi)'),
+  ('hi', 'Hindi'),
+  ('bn', 'Bengali'),
+  ('ur', 'Urdu'),
+  ('pa', 'Punjabi'),
+  ('ta', 'Tamil'),
+  ('te', 'Telugu'),
+  ('mr', 'Marathi'),
+  ('gu', 'Gujarati'),
+  ('zh-Hans', 'Chinese (Simplified)'),
+  ('zh-Hant', 'Chinese (Traditional)'),
+  ('ja', 'Japanese'),
+  ('ko', 'Korean'),
+  ('vi', 'Vietnamese'),
+  ('th', 'Thai'),
+  ('id', 'Indonesian'),
+  ('ms', 'Malay'),
+  ('tl', 'Filipino (Tagalog)'),
+  ('sw', 'Swahili'),
+  ('am', 'Amharic'),
+  ('zu', 'Zulu'),
+  ('af', 'Afrikaans'),
+] %}
+
+{% set currencies = [
+  ('USD', 'US Dollar'),
+  ('EUR', 'Euro'),
+  ('GBP', 'British Pound'),
+  ('JPY', 'Japanese Yen'),
+  ('CNY', 'Chinese Yuan'),
+  ('CHF', 'Swiss Franc'),
+  ('CAD', 'Canadian Dollar'),
+  ('AUD', 'Australian Dollar'),
+  ('NZD', 'New Zealand Dollar'),
+  ('HKD', 'Hong Kong Dollar'),
+  ('SGD', 'Singapore Dollar'),
+  ('SEK', 'Swedish Krona'),
+  ('NOK', 'Norwegian Krone'),
+  ('DKK', 'Danish Krone'),
+  ('PLN', 'Polish Zloty'),
+  ('CZK', 'Czech Koruna'),
+  ('HUF', 'Hungarian Forint'),
+  ('RON', 'Romanian Leu'),
+  ('BGN', 'Bulgarian Lev'),
+  ('HRK', 'Croatian Kuna'),
+  ('RUB', 'Russian Ruble'),
+  ('UAH', 'Ukrainian Hryvnia'),
+  ('TRY', 'Turkish Lira'),
+  ('INR', 'Indian Rupee'),
+  ('PKR', 'Pakistani Rupee'),
+  ('BDT', 'Bangladeshi Taka'),
+  ('LKR', 'Sri Lankan Rupee'),
+  ('IDR', 'Indonesian Rupiah'),
+  ('MYR', 'Malaysian Ringgit'),
+  ('THB', 'Thai Baht'),
+  ('VND', 'Vietnamese Dong'),
+  ('PHP', 'Philippine Peso'),
+  ('KRW', 'South Korean Won'),
+  ('TWD', 'New Taiwan Dollar'),
+  ('AED', 'UAE Dirham'),
+  ('SAR', 'Saudi Riyal'),
+  ('QAR', 'Qatari Riyal'),
+  ('KWD', 'Kuwaiti Dinar'),
+  ('BHD', 'Bahraini Dinar'),
+  ('OMR', 'Omani Rial'),
+  ('ILS', 'Israeli New Shekel'),
+  ('EGP', 'Egyptian Pound'),
+  ('ZAR', 'South African Rand'),
+  ('NGN', 'Nigerian Naira'),
+  ('KES', 'Kenyan Shilling'),
+  ('GHS', 'Ghanaian Cedi'),
+  ('MAD', 'Moroccan Dirham'),
+  ('BRL', 'Brazilian Real'),
+  ('MXN', 'Mexican Peso'),
+  ('ARS', 'Argentine Peso'),
+  ('CLP', 'Chilean Peso'),
+  ('COP', 'Colombian Peso'),
+  ('PEN', 'Peruvian Sol'),
+] %}
+
+<div class="lc-header">
+  <h2>Language - Currency</h2>
+  <p class="lc-subtitle">Choose the language you see the app in and the currency used across your account.</p>
+</div>
+
+<form class="lc-form" id="languageCurrencyForm" action="/settings/language-currency" method="post">
+
+  <div class="lc-field">
+    <label for="languageSelect">Select language</label>
+    <div class="lc-select-wrap">
+      <select id="languageSelect" name="language" class="lc-select lc-track">
+        {% for code, label in languages %}
+          <option value="{{ code }}" {% if code == current_language %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <span class="lc-hint">This changes the language used throughout the app.</span>
+  </div>
+
+  <div class="lc-field">
+    <label for="currencySelect">Select Currency</label>
+    <div class="lc-select-wrap">
+      <select id="currencySelect" name="currency" class="lc-select lc-track">
+        {% for code, label in currencies %}
+          <option value="{{ code }}" {% if code == current_currency %}selected{% endif %}>{{ code }} - {{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <span class="lc-hint">Amounts across your account will be shown in this currency.</span>
+  </div>
+
+  <div class="lc-actions" id="lcActions">
+    <button type="button" class="lc-btn lc-btn-secondary" id="lcCancelBtn">Cancel</button>
+    <button type="submit" class="lc-btn lc-btn-primary">Save changes</button>
+  </div>
+</form>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const lcTrackedSelects = document.querySelectorAll('.lc-track');
+    const lcActions = document.getElementById('lcActions');
+    const lcCancelBtn = document.getElementById('lcCancelBtn');
+
+    // Remember the value each dropdown started with
+    lcTrackedSelects.forEach(function(sel) {
+      sel.dataset.original = sel.value;
+    });
+
+    function lcIsDirty() {
+      let dirty = false;
+      lcTrackedSelects.forEach(function(sel) {
+        if (sel.value !== sel.dataset.original) dirty = true;
+      });
+      return dirty;
+    }
+
+    function lcUpdateActionsVisibility() {
+      lcActions.classList.toggle('lc-visible', lcIsDirty());
+    }
+
+    lcTrackedSelects.forEach(function(sel) {
+      sel.addEventListener('change', lcUpdateActionsVisibility);
+    });
+
+    if (lcCancelBtn) {
+      lcCancelBtn.addEventListener('click', function() {
+        lcTrackedSelects.forEach(function(sel) {
+          sel.value = sel.dataset.original;
+        });
+        lcUpdateActionsVisibility();
+      });
+    }
+  });
+</script>
+{% endblock %}

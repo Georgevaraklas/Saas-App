@@ -1,0 +1,794 @@
+{% extends "settings_base.html" %}
+
+{% block settings_title %}Personal details{% endblock %}
+
+{% block settings_styles %}
+  /* ---- Personal details page ---- */
+  .pd-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  .pd-avatar-wrap {
+    position: relative;
+    flex: 0 0 auto;
+  }
+  .pd-avatar {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-size: 32px;
+    border: 1px solid #eee;
+  }
+  .pd-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #f0f0f0;
+  }
+  .pd-avatar-edit {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #2952e3;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: 2px solid #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+  .pd-avatar-edit svg {
+    width: 14px;
+    height: 14px;
+  }
+  .pd-avatar-edit input {
+    display: none;
+  }
+
+  .pd-heading h2 {
+    margin: 0 0 4px;
+  }
+  .pd-heading .pd-subtitle {
+    margin: 0;
+    color: #888;
+    font-size: 14px;
+  }
+
+  .pd-form {
+    max-width: 720px;
+  }
+
+  .pd-section {
+    padding: 22px 0;
+    border-top: 1px solid #f0f0f0;
+  }
+  .pd-section:first-of-type {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .pd-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #444;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 0 0 14px;
+  }
+
+  .pd-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+  }
+
+  .pd-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .pd-field-wide {
+    grid-column: 1 / -1;
+  }
+
+  .pd-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #666;
+  }
+  .pd-field input {
+    padding: 9px 12px;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #222;
+    background: #fff;
+    box-sizing: border-box;
+  }
+  .pd-field input:focus {
+    outline: none;
+    border-color: #2952e3;
+    box-shadow: 0 0 0 3px rgba(41, 82, 227, 0.12);
+  }
+  .pd-field input:disabled {
+    background: #f5f5f5;
+    color: #999;
+    cursor: not-allowed;
+  }
+  .pd-field .pd-hint {
+    font-size: 11px;
+    color: #aaa;
+  }
+
+  .pd-input-with-action {
+    position: relative;
+  }
+  .pd-input-with-action input {
+    width: 100%;
+    padding-right: 38px;
+  }
+  .pd-copy-btn {
+    position: absolute;
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    color: #888;
+    cursor: pointer;
+  }
+  .pd-copy-btn:hover {
+    background: #e9e9e9;
+    color: #333;
+  }
+  .pd-copy-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+  .pd-copy-btn.pd-copied {
+    color: #1f9d55;
+  }
+
+  .pd-actions {
+    display: none;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 26px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+  }
+  .pd-actions.pd-visible {
+    display: flex;
+  }
+  .pd-btn {
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .pd-btn-secondary {
+    background: #fff;
+    border-color: #dcdcdc;
+    color: #444;
+  }
+  .pd-btn-secondary:hover {
+    background: #f7f7f7;
+  }
+  .pd-btn-primary {
+    background: #2952e3;
+    color: #fff;
+  }
+  .pd-btn-primary:hover {
+    background: #1f42c2;
+  }
+
+  @media (max-width: 560px) {
+    .pd-grid {
+      grid-template-columns: 1fr;
+    }
+    .pd-field-wide {
+      grid-column: auto;
+    }
+  }
+
+  .pd-vat-extra {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .pd-vat-extra-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 340px;
+  }
+  .pd-vat-extra-row input {
+    flex: 1 1 auto;
+    padding: 9px 12px;
+    border: 1px solid #dcdcdc;
+    border-radius: 8px;
+    font-size: 14px;
+    color: #222;
+    background: #fff;
+    box-sizing: border-box;
+  }
+  .pd-vat-extra-row input:focus {
+    outline: none;
+    border-color: #2952e3;
+    box-shadow: 0 0 0 3px rgba(41, 82, 227, 0.12);
+  }
+  .pd-vat-remove-btn {
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #dcdcdc;
+    background: #fff;
+    border-radius: 8px;
+    color: #888;
+    cursor: pointer;
+  }
+  .pd-vat-remove-btn:hover {
+    background: #fdf0f0;
+    border-color: #e5b8b8;
+    color: #c0392b;
+  }
+  .pd-vat-remove-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .pd-vat-extra-row input[readonly] {
+    background: #f5f5f5;
+    color: #444;
+    cursor: default;
+  }
+  .pd-vat-error {
+    font-size: 11px;
+    color: #c0392b;
+    margin-top: -4px;
+  }
+
+  .pd-add-vat-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    padding: 8px 14px;
+    border: 1px dashed #cfcfcf;
+    border-radius: 8px;
+    background: #fff;
+    color: #2952e3;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .pd-add-vat-btn:hover {
+    background: #f4f6fd;
+    border-color: #2952e3;
+  }
+  .pd-add-vat-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+{% endblock %}
+
+{% block settings_content %}
+
+<div class="pd-header">
+  <div class="pd-avatar-wrap">
+    <div class="pd-avatar" id="pdAvatarPreview">
+      {% if account and account.logo %}
+        <img id="pdAvatarImg" src="{{ url_for('uploaded_logo', filename=account.logo) }}" alt="Account logo">
+      {% else %}
+        <span id="pdAvatarPlaceholder">&#128100;</span>
+      {% endif %}
+    </div>
+    <label class="pd-avatar-edit" for="pdLogoInput" title="Change photo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+        <circle cx="12" cy="13" r="4"></circle>
+      </svg>
+      <input type="file" id="pdLogoInput" name="logo" accept="image/*" form="personalDetailsForm">
+    </label>
+  </div>
+  <div class="pd-heading">
+    <h2>Personal details</h2>
+    <p class="pd-subtitle">Manage your account information and business details.</p>
+  </div>
+</div>
+
+<form class="pd-form" id="personalDetailsForm" action="/settings/personal-details" method="post" enctype="multipart/form-data">
+
+  <div class="pd-section">
+    <h3 class="pd-section-title">Account</h3>
+    <div class="pd-grid">
+      <div class="pd-field">
+        <label for="pdName">Account name</label>
+        <input type="text" id="pdName" name="name" class="pd-track" value="{{ account.name if account else '' }}">
+      </div>
+      <div class="pd-field">
+        <label for="pdFullname">Full name</label>
+        <input type="text" id="pdFullname" name="fullname" class="pd-track" value="{{ account.fullname if account else '' }}">
+      </div>
+      <div class="pd-field">
+        <label for="pdUid">Account ID</label>
+        <div class="pd-input-with-action">
+          <input type="text" id="pdUid" value="{{ account.uid if account else '' }}" disabled>
+          <button type="button" class="pd-copy-btn" id="pdCopyUidBtn" title="Copy Account ID">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+        <span class="pd-hint" id="pdUidHint">This can't be changed</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pd-section">
+    <h3 class="pd-section-title">Contact</h3>
+    <div class="pd-grid">
+      <div class="pd-field">
+        <label for="pdEmail">Email</label>
+        <input type="email" id="pdEmail" name="email" class="pd-track" value="{{ account.email if account else '' }}">
+      </div>
+      <div class="pd-field">
+        <label for="pdPhone">Phone</label>
+        <input type="tel" id="pdPhone" name="phone" class="pd-track" value="{{ account.phone if account else '' }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="pd-section">
+    <h3 class="pd-section-title">Business</h3>
+    <div class="pd-grid">
+      <div class="pd-field">
+        <label for="pdAfm">VAT number</label>
+        <input type="text" id="pdAfm" name="afm" class="pd-track" value="{{ account.afm if account else '' }}">
+
+        <div class="pd-vat-extra" id="pdVatExtra">
+          {% if vat_numbers %}
+            {% for v in vat_numbers %}
+            <div class="pd-vat-extra-row" data-vat-id="{{ v.id }}">
+              <input type="text" value="{{ v.vat_number }}" readonly>
+              <button type="button" class="pd-vat-remove-btn" title="Remove VAT number">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <button type="button" class="pd-add-vat-btn" id="pdAddVatBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add extra VAT number
+        </button>
+      </div>
+
+      <div class="pd-field">
+        <label for="pdLocation">Locations</label>
+        <input type="text" id="pdLocation" value="{{ [account.street, account.city, account.country] | select | join(', ') if account else '' }}" readonly>
+
+        <div class="pd-vat-extra" id="pdLocationExtra">
+          {% if locations %}
+            {% for l in locations %}
+            <div class="pd-vat-extra-row" data-location-id="{{ l.id }}">
+              <input type="text" value="{{ l.location }}" readonly>
+              <button type="button" class="pd-vat-remove-btn" title="Remove location">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <button type="button" class="pd-add-vat-btn" id="pdAddLocationBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add extra location
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pd-section">
+    <h3 class="pd-section-title">Address</h3>
+    <div class="pd-grid">
+      <div class="pd-field pd-field-wide">
+        <label for="pdStreet">Address</label>
+        <input type="text" id="pdStreet" name="street" class="pd-track" value="{{ account.street if account else '' }}">
+      </div>
+      <div class="pd-field">
+        <label for="pdCity">City</label>
+        <input type="text" id="pdCity" name="city" class="pd-track" value="{{ account.city if account else '' }}">
+      </div>
+      <div class="pd-field">
+        <label for="pdCountry">Country</label>
+        <input type="text" id="pdCountry" name="country" class="pd-track" value="{{ account.country if account else '' }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="pd-actions" id="pdActions">
+    <button type="button" class="pd-btn pd-btn-secondary" id="pdCancelBtn">Cancel</button>
+    <button type="submit" class="pd-btn pd-btn-primary">Save changes</button>
+  </div>
+</form>
+
+<script>
+  const pdForm = document.getElementById('personalDetailsForm');
+  const pdActions = document.getElementById('pdActions');
+  const pdAvatarPreview = document.getElementById('pdAvatarPreview');
+  const pdLogoInput = document.getElementById('pdLogoInput');
+  const pdOriginalAvatarHTML = pdAvatarPreview ? pdAvatarPreview.innerHTML : '';
+  const pdTrackedInputs = pdForm.querySelectorAll('.pd-track');
+  let pdLogoChanged = false;
+
+  // Show the Cancel / Save changes bar only once something has actually changed
+  function pdIsDirty() {
+    if (pdLogoChanged) return true;
+    for (const input of pdTrackedInputs) {
+      if (input.value !== input.defaultValue) return true;
+    }
+    return false;
+  }
+
+  function pdUpdateActionsVisibility() {
+    pdActions.classList.toggle('pd-visible', pdIsDirty());
+  }
+
+  pdTrackedInputs.forEach(input => {
+    input.addEventListener('input', pdUpdateActionsVisibility);
+  });
+
+  // Live-preview a newly chosen logo before it's uploaded, without cropping non-square images
+  if (pdLogoInput) {
+    pdLogoInput.addEventListener('change', function() {
+      const file = this.files && this.files[0];
+      if (!file) return;
+      pdLogoChanged = true;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        pdAvatarPreview.innerHTML = '<img id="pdAvatarImg" src="' + e.target.result + '" alt="Account logo">';
+      };
+      reader.readAsDataURL(file);
+      pdUpdateActionsVisibility();
+    });
+  }
+
+  // Cancel discards unsaved edits and hides the actions bar again
+  const pdCancelBtn = document.getElementById('pdCancelBtn');
+  if (pdCancelBtn) {
+    pdCancelBtn.addEventListener('click', function() {
+      pdForm.reset();
+      pdAvatarPreview.innerHTML = pdOriginalAvatarHTML;
+      pdLogoChanged = false;
+      pdUpdateActionsVisibility();
+    });
+  }
+
+  // Extra VAT numbers: each row saves/deletes instantly against the server,
+  // independent of the main "Save changes" bar.
+  const pdAddVatBtn = document.getElementById('pdAddVatBtn');
+  const pdVatExtra = document.getElementById('pdVatExtra');
+
+  function pdVatRemoveIconSvg() {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+  }
+
+  function pdShowRowError(row, message) {
+    pdClearRowError(row);
+    const err = document.createElement('div');
+    err.className = 'pd-vat-error';
+    err.textContent = message;
+    row.insertAdjacentElement('afterend', err);
+    row._pdErrorEl = err;
+  }
+
+  function pdClearRowError(row) {
+    if (row._pdErrorEl) {
+      row._pdErrorEl.remove();
+      row._pdErrorEl = null;
+    }
+  }
+
+  function pdDeleteVatRow(row) {
+    const vatId = row.dataset.vatId;
+    const removeBtn = row.querySelector('.pd-vat-remove-btn');
+
+    // Not saved yet — just remove it locally, nothing to delete server-side
+    if (!vatId) {
+      row.remove();
+      return;
+    }
+
+    removeBtn.disabled = true;
+    fetch('/settings/personal-details/vat/' + encodeURIComponent(vatId), {
+      method: 'DELETE',
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Could not remove VAT number.');
+        }
+        pdClearRowError(row);
+        row.remove();
+      })
+      .catch((err) => {
+        removeBtn.disabled = false;
+        pdShowRowError(row, err.message);
+      });
+  }
+
+  function pdSaveVatRow(row, input) {
+    const value = input.value.trim();
+
+    // Nothing typed — discard the empty row rather than saving it
+    if (!value) {
+      row.remove();
+      return;
+    }
+
+    input.disabled = true;
+    const body = new URLSearchParams();
+    body.set('afm_extra', value);
+
+    fetch('/settings/personal-details/vat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Could not save VAT number.');
+        }
+        pdClearRowError(row);
+        row.dataset.vatId = data.id;
+        input.value = data.vat_number;
+        input.readOnly = true;
+        input.disabled = false;
+      })
+      .catch((err) => {
+        input.disabled = false;
+        pdShowRowError(row, err.message);
+      });
+  }
+
+  function pdAttachVatRow(row) {
+    const input = row.querySelector('input');
+    const removeBtn = row.querySelector('.pd-vat-remove-btn');
+
+    removeBtn.addEventListener('click', function() {
+      pdDeleteVatRow(row);
+    });
+
+    // Only unsaved rows (no data-vat-id yet) get save-on-blur behavior
+    if (!row.dataset.vatId) {
+      let saved = false;
+      input.addEventListener('blur', function() {
+        if (saved) return;
+        saved = true;
+        pdSaveVatRow(row, input);
+      });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          input.blur();
+        }
+      });
+    }
+  }
+
+  // Wire up rows already rendered server-side
+  if (pdVatExtra) {
+    pdVatExtra.querySelectorAll('.pd-vat-extra-row').forEach(pdAttachVatRow);
+  }
+
+  function pdAddVatRow() {
+    const row = document.createElement('div');
+    row.className = 'pd-vat-extra-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Extra VAT number';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'pd-vat-remove-btn';
+    removeBtn.title = 'Remove VAT number';
+    removeBtn.innerHTML = pdVatRemoveIconSvg();
+
+    row.appendChild(input);
+    row.appendChild(removeBtn);
+    pdVatExtra.appendChild(row);
+
+    pdAttachVatRow(row);
+    input.focus();
+  }
+
+  if (pdAddVatBtn) {
+    pdAddVatBtn.addEventListener('click', pdAddVatRow);
+  }
+
+  // Extra locations: same pattern as extra VAT numbers above, its own endpoints.
+  const pdAddLocationBtn = document.getElementById('pdAddLocationBtn');
+  const pdLocationExtra = document.getElementById('pdLocationExtra');
+
+  function pdDeleteLocationRow(row) {
+    const locationId = row.dataset.locationId;
+    const removeBtn = row.querySelector('.pd-vat-remove-btn');
+
+    if (!locationId) {
+      row.remove();
+      return;
+    }
+
+    removeBtn.disabled = true;
+    fetch('/settings/personal-details/location/' + encodeURIComponent(locationId), {
+      method: 'DELETE',
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Could not remove location.');
+        }
+        pdClearRowError(row);
+        row.remove();
+      })
+      .catch((err) => {
+        removeBtn.disabled = false;
+        pdShowRowError(row, err.message);
+      });
+  }
+
+  function pdSaveLocationRow(row, input) {
+    const value = input.value.trim();
+
+    if (!value) {
+      row.remove();
+      return;
+    }
+
+    input.disabled = true;
+    const body = new URLSearchParams();
+    body.set('location', value);
+
+    fetch('/settings/personal-details/location', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || 'Could not save location.');
+        }
+        pdClearRowError(row);
+        row.dataset.locationId = data.id;
+        input.value = data.location;
+        input.readOnly = true;
+        input.disabled = false;
+      })
+      .catch((err) => {
+        input.disabled = false;
+        pdShowRowError(row, err.message);
+      });
+  }
+
+  function pdAttachLocationRow(row) {
+    const input = row.querySelector('input');
+    const removeBtn = row.querySelector('.pd-vat-remove-btn');
+
+    removeBtn.addEventListener('click', function() {
+      pdDeleteLocationRow(row);
+    });
+
+    if (!row.dataset.locationId) {
+      let saved = false;
+      input.addEventListener('blur', function() {
+        if (saved) return;
+        saved = true;
+        pdSaveLocationRow(row, input);
+      });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          input.blur();
+        }
+      });
+    }
+  }
+
+  if (pdLocationExtra) {
+    pdLocationExtra.querySelectorAll('.pd-vat-extra-row').forEach(pdAttachLocationRow);
+  }
+
+  function pdAddLocationRow() {
+    const row = document.createElement('div');
+    row.className = 'pd-vat-extra-row';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'Extra location';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'pd-vat-remove-btn';
+    removeBtn.title = 'Remove location';
+    removeBtn.innerHTML = pdVatRemoveIconSvg();
+
+    row.appendChild(input);
+    row.appendChild(removeBtn);
+    pdLocationExtra.appendChild(row);
+
+    pdAttachLocationRow(row);
+    input.focus();
+  }
+
+  if (pdAddLocationBtn) {
+    pdAddLocationBtn.addEventListener('click', pdAddLocationRow);
+  }
+
+  // Copy the Account ID to the clipboard
+  const pdCopyUidBtn = document.getElementById('pdCopyUidBtn');
+  const pdUidInput = document.getElementById('pdUid');
+  const pdUidHint = document.getElementById('pdUidHint');
+  if (pdCopyUidBtn && pdUidInput && pdUidHint) {
+    const pdUidHintDefault = pdUidHint.textContent;
+    let pdCopyResetTimer = null;
+
+    pdCopyUidBtn.addEventListener('click', async function() {
+      try {
+        await navigator.clipboard.writeText(pdUidInput.value);
+        pdUidHint.textContent = 'Copied to clipboard!';
+        pdCopyUidBtn.classList.add('pd-copied');
+      } catch (err) {
+        pdUidHint.textContent = "Couldn't copy — copy it manually.";
+      }
+      clearTimeout(pdCopyResetTimer);
+      pdCopyResetTimer = setTimeout(function() {
+        pdUidHint.textContent = pdUidHintDefault;
+        pdCopyUidBtn.classList.remove('pd-copied');
+      }, 1800);
+    });
+  }
+</script>
+{% endblock %}

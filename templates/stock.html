@@ -1,0 +1,2189 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Stock Inventory
+{% endblock %}
+
+{% block styles %}
+  <link href="/static/popup.css" rel="stylesheet">
+  <style>
+    /* --- Extra styles for the Stock table --- */
+    .stock-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-top: 10px;
+    }
+    .stock-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .stock-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .stock-table-wrapper thead th {
+      text-align: left;
+      padding: 18px 24px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .stock-table-wrapper tbody td {
+      padding: 20px 24px;
+      font-size: 15px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .stock-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .stock-table-wrapper tbody tr:hover td {
+      background: #fafafa;
+    }
+    .stock-table-wrapper .no-products-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 32px;
+    }
+
+    /* Edit button (replaces Remove) */
+    .stock-table-wrapper .edit-btn {
+      font-size: 14px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .stock-table-wrapper .edit-btn:hover {
+      background: #0069d9;
+    }
+    .stock-table-wrapper .edit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .lot-btn, .field-btn {
+      font-size: 12px;
+      background: #3547d1;
+      color: #fff;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      margin-top: 6px;
+      display: inline-block;
+    }
+    .lot-btn:hover, .field-btn:hover {
+      background: #2a38a8;
+    }
+
+    .lot-value, .field-value {
+      font-size: 15px;
+      color: #333;
+      display: block;
+    }
+
+    .stock-row {
+      cursor: default;
+    }
+    .stock-row:hover {
+      background: #fafafa;
+    }
+
+    .mtopbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .mtopbar .left-buttons {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+    }
+    .mtopbar .right-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .mtopbar .stock-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .mtopbar .stock-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .mtopbar .stock-sort-wrap select {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .mtopbar .stock-sort-wrap select:focus {
+      border-color: #111;
+    }
+    .mtopbar .right-search {
+      display: flex;
+      align-items: center;
+    }
+    .mtopbar .right-search input {
+      padding: 8px 14px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      width: 200px;
+      transition: border-color 0.15s ease;
+    }
+    .mtopbar .right-search input:focus {
+      border-color: #111;
+    }
+
+    /* Searchable dropdown (used in New Stock Item modal) */
+    .search-select {
+      position: relative;
+      width: 100%;
+    }
+    .search-select-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .search-select-results {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      z-index: 20;
+    }
+    .search-select-results.open {
+      display: block;
+    }
+    .search-select-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .search-select-option:hover,
+    .search-select-option.active {
+      background: #f2f2f2;
+    }
+    .search-select-option.no-match {
+      cursor: default;
+      color: #888;
+      font-style: italic;
+    }
+    .search-select-option.no-match:hover {
+      background: transparent;
+    }
+    .search-select-option.hidden {
+      display: none;
+    }
+
+    /* =======================================================
+       Page shell — matches index.html's redesigned header/card
+       pattern, built on top of layout.html's design system.
+       ======================================================= */
+    .stock-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .stock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .stock-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .stock-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing add/sync buttons + sort + search */
+    .stock-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .mtopbar .left-buttons .btn-primary-dark,
+    .mtopbar .left-buttons .btn-secondary-light {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .mtopbar .left-buttons .btn-primary-dark svg,
+    .mtopbar .left-buttons .btn-secondary-light svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+    .mtopbar .left-buttons .btn-primary-dark {
+      background: #1c1c1c;
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+    }
+    .mtopbar .left-buttons .btn-primary-dark:hover {
+      background: #303030;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+    .mtopbar .left-buttons .btn-secondary-light {
+      background: #F1F1F3;
+      color: #1c1c1c;
+    }
+    .mtopbar .left-buttons .btn-secondary-light:hover {
+      background: #E7E7EA;
+      transform: translateY(-1px);
+    }
+
+    /* Table card wrapper (outer shell around the existing table styling) */
+    .stock-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .stock-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .mtopbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .mtopbar .left-buttons,
+      .mtopbar .right-controls {
+        width: 100%;
+        justify-content: stretch;
+      }
+      .mtopbar .left-buttons .btn-primary-dark,
+      .mtopbar .left-buttons .btn-secondary-light {
+        flex: 1 1 auto;
+        justify-content: center;
+      }
+      .mtopbar .right-search input {
+        width: 100%;
+      }
+      .stock-toolbar-card,
+      .stock-table-card {
+        padding: 16px 14px 20px;
+      }
+    }
+
+    /* --- Sync Order popup styles (reused for edit order selection) --- */
+    .sync-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1060;
+    }
+
+    .sync-overlay.active {
+      display: flex;
+    }
+
+    .sync-modal {
+      background: white;
+      padding: 24px;
+      border-radius: 10px;
+      width: 700px;
+      max-width: 90vw;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .sync-modal h2 {
+      margin-top: 0;
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    .sync-controls-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .sync-sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .sync-sort-wrap label {
+      font-size: 13px;
+      color: #555;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .sync-sort-wrap select {
+      padding: 9px 12px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+      cursor: pointer;
+      transition: border-color 0.15s ease;
+    }
+    .sync-sort-wrap select:focus {
+      border-color: #111;
+    }
+    .sync-search-wrap {
+      position: relative;
+      margin-bottom: 0;
+      flex: 1;
+    }
+    .sync-search-wrap input[type="text"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid #ddd;
+      border-radius: 20px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+    .sync-search-wrap input[type="text"]:focus {
+      border-color: #111;
+    }
+    .sync-search-wrap .sync-search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 14px;
+      color: #999;
+      pointer-events: none;
+    }
+
+    .sync-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .sync-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .sync-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .sync-table-wrapper thead th {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .sync-table-wrapper tbody td {
+      padding: 14px 16px;
+      font-size: 14px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .sync-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .sync-table-wrapper tbody tr:hover td {
+      background: #fafafa;
+    }
+    .sync-table-wrapper .sync-order-row {
+      cursor: pointer;
+    }
+    .sync-table-wrapper .no-orders-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 24px;
+    }
+
+    .sync-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .sync-modal-actions button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .sync-cancel-btn {
+      background: #e5e5e5;
+    }
+
+    /* --- Use Recipe switch (for orders not yet received) --- */
+    .use-recipe-switch-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 0 16px;
+    }
+    .use-recipe-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .use-recipe-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .use-recipe-slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #ccc;
+      transition: background-color 0.15s ease;
+      border-radius: 24px;
+    }
+    .use-recipe-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #fff;
+      transition: transform 0.15s ease;
+      border-radius: 50%;
+    }
+    .use-recipe-switch input:checked + .use-recipe-slider {
+      background-color: #0b1215;
+    }
+    .use-recipe-switch input:checked + .use-recipe-slider:before {
+      transform: translateX(20px);
+    }
+    .use-recipe-label {
+      font-size: 14px;
+      font-weight: 600;
+    }
+    /* --- Traceability batch-selection modal --- */
+    .trace-ingredient-block { margin-bottom: 18px; }
+    .trace-ingredient-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    .trace-ingredient-progress {
+      font-size: 12px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #eee;
+      color: #666;
+    }
+    .trace-ingredient-progress.trace-progress-ok { background: #e6f7ec; color: #1a7f3c; }
+    .trace-ingredient-progress.trace-progress-short { background: #fdecea; color: #c0392b; }
+    .trace-batch-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      border: 1px solid #eee;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .trace-batch-table thead th {
+      text-align: left;
+      padding: 6px 8px;
+      background: #f5f5f5;
+      color: #444;
+      font-weight: 600;
+    }
+    .trace-batch-table tbody td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .trace-batch-table .trace-batch-qty {
+      width: 70px;
+      padding: 4px 6px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .use-recipe-hint {
+      color: #888;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0 0 20px;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-pill.paid {
+      background: #e6f6ea;
+      color: #1a7f37;
+    }
+    .status-pill.pending {
+      background: #fdf1e2;
+      color: #b8860b;
+    }
+
+    /* --- Generic Field Modal (for location, dates, invoice, LOT) --- */
+    .field-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1070;
+    }
+
+    .field-overlay.active {
+      display: flex;
+    }
+
+    .field-modal {
+      background: white;
+      padding: 24px;
+      border-radius: 10px;
+      width: 700px;
+      max-width: 90vw;
+      max-height: 70vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .field-modal h2 {
+      margin-top: 0;
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    .field-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .field-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .field-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .field-table-wrapper thead th {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .field-table-wrapper tbody td {
+      padding: 14px 16px;
+      font-size: 14px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .field-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .field-table-wrapper tbody tr:hover td {
+      background: #fafafa;
+    }
+    .field-table-wrapper .no-items-row td {
+      text-align: center;
+      color: #999;
+      font-style: italic;
+      padding: 24px;
+    }
+
+    .field-modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .field-modal-actions button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .field-close-btn {
+      background: #e5e5e5;
+    }
+
+    /* Delete button in modal (keep for field modals) */
+    .delete-stock-btn {
+      background: transparent;
+      border: none;
+      font-size: 18px;
+      cursor: pointer;
+      color: #dc3545;
+      padding: 2px 6px;
+      transition: transform 0.1s ease;
+    }
+    .delete-stock-btn:hover {
+      transform: scale(1.2);
+      color: #a71d2a;
+    }
+
+    /* --- Styles for the edit-stock-items modal (editable fields) --- */
+    .edit-stock-items-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+      z-index: 1080;
+    }
+    .edit-stock-items-overlay.active {
+      display: flex;
+    }
+
+    .edit-stock-items-modal {
+      background: white;
+      padding: 24px;
+      border-radius: 10px;
+      width: 900px;
+      max-width: 95vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .edit-stock-items-modal h2 {
+      margin-top: 0;
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    .edit-stock-items-table-wrapper {
+      width: 100%;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .edit-stock-items-table-wrapper table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .edit-stock-items-table-wrapper thead tr {
+      background: #111;
+      color: #fff;
+    }
+    .edit-stock-items-table-wrapper thead th {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .edit-stock-items-table-wrapper tbody td {
+      padding: 12px 16px;
+      font-size: 14px;
+      vertical-align: middle;
+      border-bottom: 1px solid #eee;
+    }
+    .edit-stock-items-table-wrapper tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .edit-stock-items-table-wrapper tbody tr:hover td {
+      background: #fafafa;
+    }
+    .edit-stock-items-table-wrapper input[type="number"],
+    .edit-stock-items-table-wrapper input[type="text"],
+    .edit-stock-items-table-wrapper input[type="date"] {
+      width: 100%;
+      padding: 6px 8px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    .edit-stock-items-table-wrapper input[type="number"] {
+      width: 80px;
+    }
+
+    .edit-stock-items-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .edit-stock-items-actions button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .edit-stock-items-cancel-btn {
+      background: #e5e5e5;
+    }
+    .edit-stock-items-save-btn {
+      background: #0b1215;
+      color: white;
+    }
+  </style>
+{% endblock %}
+
+{% block main %}
+
+<div class="stock-wrap">
+
+  <div class="stock-header">
+    <div>
+      <p class="greeting-eyebrow">Inventory</p>
+      <h1>Stock</h1>
+    </div>
+  </div>
+
+  <div class="stock-toolbar-card">
+    <div class="mtopbar">
+      <div class="left-buttons">
+        <button class="btn-primary-dark" id="openFormBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+          Add Product
+        </button>
+        <button class="btn-secondary-light" id="openSyncBtn">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 8A6.4 6.4 0 1 1 6 13.4"/><path d="M4 4v4h4"/></svg>
+          Sync Order
+        </button>
+      </div>
+      <div class="right-controls">
+        <div class="stock-sort-wrap">
+          <label for="stock-location-filter">Location</label>
+          <select id="stock-location-filter">
+            <option value="" selected>All Locations</option>
+          </select>
+        </div>
+        <div class="stock-sort-wrap">
+          <label for="stock-sort-select">Sort By</label>
+          <select id="stock-sort-select">
+            <option value="date_desc" selected>Production Date (Newest First)</option>
+            <option value="date_asc">Production Date (Oldest First)</option>
+            <option value="expiration_desc">Expiration Date (Newest First)</option>
+            <option value="expiration_asc">Expiration Date (Oldest First)</option>
+            <option value="name_asc">Product Name (A–Z)</option>
+            <option value="name_desc">Product Name (Z–A)</option>
+          </select>
+        </div>
+        <div class="right-search">
+          <input type="text" id="stockSearchInput" placeholder="Search stock...">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+
+    <!-- Add Product Popup -->
+    <div class="popup-overlay" id="overlay">
+      <div class="popup-modal">
+        <form id="productForm" action="/add_productstock" method="POST">
+          <h2>New Stock Item</h2>
+
+          <label for="productSearchInput">Product</label>
+          <div class="search-select" id="productSearchWrap">
+            <input type="text" id="productSearchInput" class="search-select-input" placeholder="Search product..." autocomplete="off">
+            <input type="hidden" id="productSelect" name="product_id" value="">
+            <div class="search-select-results" id="productSearchResults">
+              {% for product in products %}
+                <div class="search-select-option" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" data-uom="{{ product.uom or '' }}">{{ product.name }}</div>
+              {% endfor %}
+              <div class="search-select-option no-match" id="productNoMatch" style="display:none;">No matching products</div>
+            </div>
+          </div>
+
+          <label for="productPrice">Price</label>
+          <input type="text" id="productPrice" placeholder="Price" readonly>
+          <input type="hidden" id="productPriceHidden" name="price">
+
+          <label for="productQuantity">Quantity <span id="productUomLabel"></span></label>
+          <input type="number" id="productQuantity" placeholder="Quantity" step="1" min="1" name="quantity" required>
+
+          <label for="productLocation">Location</label>
+          <input type="text" id="productLocation" placeholder="Location" name="location">
+
+          <label for="productionDate">Production Date</label>
+          <input type="date" id="productionDate" name="production_date">
+
+          <label for="expirationDate">Expiration Date (Optional)</label>
+          <input type="date" id="expirationDate" name="expiration_date">
+
+          <label for="invoiceNumber">Invoice Number (Optional)</label>
+          <input type="text" id="invoiceNumber" placeholder="Invoice Number" name="invoice_number">
+
+          <div class="popup-modal-actions">
+            <button type="button" class="popup-cancel-btn" id="cancelBtn">Cancel</button>
+            <button type="submit" class="popup-save-btn" id="saveBtn">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Sync Order Popup -->
+    <div class="sync-overlay" id="syncOverlay">
+      <div class="sync-modal">
+        <h2>Sync Order to Stock</h2>
+        
+        <div class="sync-controls-row">
+          <div class="sync-sort-wrap">
+            <label for="sync-sort-select">Sort By</label>
+            <select id="sync-sort-select">
+              <option value="date_desc" selected>Date (Newest First)</option>
+              <option value="date_asc">Date (Oldest First)</option>
+              <option value="name_asc">Contact Name (A–Z)</option>
+              <option value="name_desc">Contact Name (Z–A)</option>
+            </select>
+          </div>
+          <div class="sync-search-wrap">
+            <span class="sync-search-icon">🔍</span>
+            <input type="text" id="sync-search-input" placeholder="Search orders...">
+          </div>
+        </div>
+
+        <div class="sync-table-wrapper">
+          <table id="syncOrdersTable">
+            <thead>
+              <tr>
+                <th>Order ID</th>
+                <th>Contact Name</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Issue Date</th>
+              </tr>
+            </thead>
+            <tbody id="syncOrdersBody">
+              {% if orders %}
+                {% for order in orders %}
+                  <tr class="sync-order-row" data-oid="{{ order.oid }}" data-receive="{{ order.receive }}" data-customer="{{ order.customer_name }}" data-date="{{ order.rdate }}">
+                    <td>{{ order.oid }}</td>
+                    <td class="product-name">{{ order.customer_name }}</td>
+                    <td>{{ order.order_type }}</td>
+                    <td>
+                      {% if order.pstatus == 'Paid' %}
+                        <span class="status-pill paid">{{ order.pstatus }}</span>
+                      {% else %}
+                        <span class="status-pill pending">{{ order.pstatus }}</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ order.rdate }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr class="no-orders-row">
+                  <td colspan="5">No orders available to sync</td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sync-modal-actions">
+          <button type="button" class="sync-cancel-btn" id="syncCancelBtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Use Recipe Confirmation Popup (shown when the selected order has receive = 0) -->
+    <div class="sync-overlay" id="useRecipeOverlay" style="z-index: 1065;">
+      <div class="sync-modal" style="width: 440px;">
+        <h2>Process Order <span id="useRecipeOrderIdDisplay"></span></h2>
+
+        <div class="use-recipe-switch-row">
+          <label class="use-recipe-switch">
+            <input type="checkbox" id="useRecipeToggle">
+            <span class="use-recipe-slider"></span>
+          </label>
+          <span class="use-recipe-label">Use Recipe</span>
+        </div>
+
+        <p class="use-recipe-hint">
+          <strong>Off</strong> — the order's items are subtracted directly from the stock table.<br>
+          <strong>On</strong> — matching recipes are executed to produce the number of items the order needs.
+        </p>
+
+        <div class="use-recipe-switch-row" id="orderTraceabilityToggleRow" style="display:none;">
+          <label class="use-recipe-switch">
+            <input type="checkbox" id="orderTraceabilityToggle">
+            <span class="use-recipe-slider"></span>
+          </label>
+          <span class="use-recipe-label">Traceability</span>
+        </div>
+        <p class="use-recipe-hint" id="orderTraceabilityHint" style="display:none;">
+          <strong>Off</strong> — ingredients are auto-consumed (oldest stock first).<br>
+          <strong>On</strong> — you'll choose exactly which stock batches (location, lot, dates) to use for each recipe.
+        </p>
+
+        <div class="sync-modal-actions">
+          <button type="button" class="sync-cancel-btn" id="useRecipeCancelBtn">Cancel</button>
+          <button type="button" class="popup-save-btn" id="useRecipeConfirmBtn">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Traceability Selection Modal -->
+    <div class="sync-overlay" id="orderTraceabilityOverlay" style="z-index: 1070;">
+      <div class="sync-modal" style="width: 680px; max-height: 82vh; overflow-y:auto;">
+        <h2>Select Ingredient Batches</h2>
+        <p class="use-recipe-hint">Choose which stock batches to use for each recipe this order needs.</p>
+        <div id="orderTraceabilityWrap"></div>
+        <div class="form-error show" id="orderTraceabilityFormError" style="display:none;color:#c0392b;font-size:13px;margin:8px 0;">
+          Please select enough stock to cover the required quantity for every ingredient.
+        </div>
+        <div class="sync-modal-actions">
+          <button type="button" class="sync-cancel-btn" id="orderTraceabilityCancelBtn">Cancel</button>
+          <button type="button" class="popup-save-btn" id="orderTraceabilityConfirmBtn">Confirm &amp; Process</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Entry Picker Popup (shows every individual stock entry for the clicked product) -->
+    <div class="sync-overlay" id="editOrderOverlay">
+      <div class="sync-modal">
+        <h2 id="editPickerTitle">Select which entry to edit</h2>
+
+        <div class="sync-search-wrap">
+          <span class="sync-search-icon">🔍</span>
+          <input type="text" id="edit-order-search-input" placeholder="Search entries...">
+        </div>
+
+        <div class="sync-table-wrapper">
+          <table id="editOrdersTable">
+            <thead>
+              <tr>
+                <th>Quantity</th>
+                <th>Location</th>
+                <th>Production Date</th>
+                <th>Expiration Date</th>
+                <th>Invoice Number</th>
+                <th>LOT</th>
+                <th>Order ID</th>
+              </tr>
+            </thead>
+            <tbody id="editOrdersBody">
+              <tr class="no-orders-row"><td colspan="7">Loading items...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="sync-modal-actions">
+          <button type="button" class="sync-cancel-btn" id="editOrderCancelBtn">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Single Stock Item Popup (form for the entry chosen above) -->
+    <div class="edit-stock-items-overlay" id="editStockItemsOverlay">
+      <div class="edit-stock-items-modal">
+        <h2>Edit Stock Item <span id="editItemProductName"></span></h2>
+
+        <div class="edit-stock-items-table-wrapper">
+          <table id="editStockItemsTable">
+            <tbody>
+              <tr><td>Quantity</td><td><input type="number" min="0" step="1" id="editItemQuantity"></td></tr>
+              <tr><td>Location</td><td><input type="text" id="editItemLocation"></td></tr>
+              <tr><td>Production Date</td><td><input type="date" id="editItemProductionDate"></td></tr>
+              <tr><td>Expiration Date</td><td><input type="date" id="editItemExpirationDate"></td></tr>
+              <tr><td>Invoice Number</td><td><input type="text" id="editItemInvoiceNumber"></td></tr>
+              <tr><td>LOT</td><td><input type="text" id="editItemLot"></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="edit-stock-items-actions">
+          <button type="button" class="edit-stock-items-cancel-btn" id="editStockItemsCancelBtn">Cancel</button>
+          <button type="button" class="edit-stock-items-save-btn" id="editStockItemsSaveBtn">Save Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generic Field Modal (for Location, Production Date, Expiration Date, Invoice Number, and LOT) -->
+    <div class="field-overlay" id="fieldOverlay">
+      <div class="field-modal">
+        <h2 id="fieldModalTitle">Field Details</h2>
+        
+        <div class="field-table-wrapper">
+          <table id="fieldTable">
+            <thead>
+              <tr>
+                <th id="fieldCol1">Field</th>
+                <th>Quantity</th>
+                <th>Order ID</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="fieldTableBody">
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="field-modal-actions">
+          <button type="button" class="field-close-btn" id="fieldCloseBtn">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Stock Table -->
+    <div class="stock-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">Products in Stock</h2>
+      <span class="section-sub">{{ row|length if row else 0 }} entries</span>
+    </div>
+    <div class="stock-table-wrapper">
+      <table id="productsTable">
+        <thead>
+          <tr>
+            <th>Product Name</th>
+            <th>SKU</th>
+            <th>Quantity</th>
+            <th>UoM</th>
+            <th>Location</th>
+            <th>Production Date</th>
+            <th>Expiration Date</th>
+            <th>Invoice Number</th>
+            <th>LOT Number</th>
+            <th>Edit</th>
+          </tr>
+        </thead>
+        <tbody id="productsTableBody">
+          {% if row %}
+            {% for item in row %}
+              <tr class="stock-row" data-stock-id="{{ item.id }}" data-pid="{{ item.pid }}" data-name="{{ item.name }}" data-production-date="{{ item['production_date'] or '' }}" data-expiration-date="{{ item['expiration_date'] or '' }}" data-location="{{ item['location'] or '' }}">
+                <td>{{ item["name"] }}</td>
+                <td>{{ item["sku"] if item["sku"] is not none and item["sku"] != '' else '-' }}</td>
+                <td>{{ item["quantity"] }}</td>
+                <td>{{ item["uom"] or '-' }}</td>
+                <td>
+                  <!-- ADDED data-pid -->
+                  <button type="button" class="field-btn" data-field="location" data-value="{{ item['location'] or '' }}" data-pid="{{ item.pid }}">View</button>
+                </td>
+                <td>
+                  <button type="button" class="field-btn" data-field="production_date" data-value="{{ item['production_date'] or '' }}" data-pid="{{ item.pid }}">View</button>
+                </td>
+                <td>
+                  <button type="button" class="field-btn" data-field="expiration_date" data-value="{{ item['expiration_date'] or '' }}" data-pid="{{ item.pid }}">View</button>
+                </td>
+                <td>
+                  <button type="button" class="field-btn" data-field="invoice_number" data-value="{{ item['invoice_number'] or '' }}" data-pid="{{ item.pid }}">View</button>
+                </td>
+                <td>
+                  <span class="lot-value">{{ item["lot"] or '-' }}</span>
+                  <button type="button" class="lot-btn" data-pid="{{ item.pid }}" data-name="{{ item.name }}">View LOTs</button>
+                </td>
+                <td>
+                  <button type="button" class="edit-btn" data-stock-id="{{ item.id }}">Edit</button>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr class="no-products-row" id="no-products-row">
+              <td colspan="10">No products in stock</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    </div>
+
+  </div>
+
+  <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
+</div>
+
+<script>
+  // --- Add Product Popup ---
+  const overlay = document.getElementById('overlay');
+  const openFormBtn = document.getElementById('openFormBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const productForm = document.getElementById('productForm');
+  const productSelect = document.getElementById('productSelect');
+  const productSearchWrap = document.getElementById('productSearchWrap');
+  const productSearchInput = document.getElementById('productSearchInput');
+  const productSearchResults = document.getElementById('productSearchResults');
+  const productNoMatch = document.getElementById('productNoMatch');
+  const productOptions = Array.from(productSearchResults.querySelectorAll('.search-select-option:not(.no-match)'));
+  const productPrice = document.getElementById('productPrice');
+  const productPriceHidden = document.getElementById('productPriceHidden');
+  const productUomLabel = document.getElementById('productUomLabel');
+
+  function formatMoney(value) {
+    const num = parseFloat(value);
+    return isNaN(num) ? '' : '$' + num.toFixed(2);
+  }
+
+  function updatePriceDisplay() {
+    const price = productSelect.value ? productSelect.dataset.price : '';
+    const uom = productSelect.value ? productSelect.dataset.uom : '';
+    productPrice.value = formatMoney(price);
+    productPriceHidden.value = price || '';
+    productUomLabel.textContent = uom ? `(${uom})` : '';
+  }
+
+  function resetProductSearch() {
+    productSelect.value = '';
+    delete productSelect.dataset.name;
+    delete productSelect.dataset.price;
+    delete productSelect.dataset.uom;
+    productSearchInput.value = '';
+    updatePriceDisplay();
+  }
+
+  function openProductResults() {
+    productSearchResults.classList.add('open');
+  }
+
+  function closeProductResults() {
+    productSearchResults.classList.remove('open');
+  }
+
+  function filterProductOptions() {
+    const query = productSearchInput.value.trim().toLowerCase();
+    let visibleCount = 0;
+
+    productOptions.forEach(option => {
+      const matches = option.dataset.name.toLowerCase().includes(query);
+      option.classList.toggle('hidden', !matches);
+      if (matches) visibleCount += 1;
+    });
+
+    productNoMatch.style.display = visibleCount === 0 ? '' : 'none';
+  }
+
+  function selectProduct(option) {
+    productSelect.value = option.dataset.id;
+    productSelect.dataset.name = option.dataset.name;
+    productSelect.dataset.price = option.dataset.price;
+    productSelect.dataset.uom = option.dataset.uom;
+    productSearchInput.value = option.dataset.name;
+    closeProductResults();
+    updatePriceDisplay();
+  }
+
+  openFormBtn.addEventListener('click', () => {
+    resetProductSearch();
+    overlay.classList.add('active');
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    overlay.classList.remove('active');
+  });
+
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) overlay.classList.remove('active');
+  });
+
+  productSearchInput.addEventListener('focus', () => {
+    filterProductOptions();
+    openProductResults();
+  });
+
+  productSearchInput.addEventListener('input', () => {
+    // typing invalidates any previously selected product until a new one is chosen
+    productSelect.value = '';
+    delete productSelect.dataset.name;
+    delete productSelect.dataset.price;
+    delete productSelect.dataset.uom;
+    updatePriceDisplay();
+    filterProductOptions();
+    openProductResults();
+  });
+
+  productOptions.forEach(option => {
+    option.addEventListener('click', () => selectProduct(option));
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!productSearchWrap.contains(e.target)) {
+      closeProductResults();
+    }
+  });
+
+  productForm.addEventListener('submit', (e) => {
+    if (!productSelect.value) {
+      e.preventDefault();
+      alert('Please select a product.');
+    }
+  });
+
+  // --- Sync Order Popup (unchanged) ---
+  const syncOverlay = document.getElementById('syncOverlay');
+  const openSyncBtn = document.getElementById('openSyncBtn');
+  const syncCancelBtn = document.getElementById('syncCancelBtn');
+
+  openSyncBtn.addEventListener('click', () => {
+    syncOverlay.classList.add('active');
+  });
+
+  syncCancelBtn.addEventListener('click', () => {
+    syncOverlay.classList.remove('active');
+  });
+
+  syncOverlay.addEventListener('click', (e) => {
+    if (e.target === syncOverlay) syncOverlay.classList.remove('active');
+  });
+
+  // Sync order row click -> sync to stock
+  const syncOrdersBody = document.getElementById('syncOrdersBody');
+
+  syncOrdersBody.addEventListener('click', (e) => {
+    const row = e.target.closest('.sync-order-row');
+    if (!row) return;
+
+    const orderId = row.dataset.oid;
+    if (!orderId) return;
+
+    // Orders that have not been received yet go through the Use Recipe prompt instead
+    if (row.dataset.receive === '0') {
+      openUseRecipePrompt(orderId);
+      return;
+    }
+
+    if (!confirm(`Sync order ${orderId} to stock?`)) return;
+
+    fetch('/syncorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId })
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to sync order');
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert(`Order ${orderId} synced successfully! ${data.items_synced} items added to stock.`);
+        syncOverlay.classList.remove('active');
+        window.location.reload();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while syncing the order.');
+      });
+  });
+
+  // --- Use Recipe Confirmation Popup (orders with receive = 0) ---
+  const useRecipeOverlay = document.getElementById('useRecipeOverlay');
+  const useRecipeOrderIdDisplay = document.getElementById('useRecipeOrderIdDisplay');
+  const useRecipeToggle = document.getElementById('useRecipeToggle');
+  const useRecipeCancelBtn = document.getElementById('useRecipeCancelBtn');
+  const useRecipeConfirmBtn = document.getElementById('useRecipeConfirmBtn');
+
+  let pendingUnreceivedOrderId = null;
+
+  function openUseRecipePrompt(orderId) {
+    pendingUnreceivedOrderId = orderId;
+    useRecipeOrderIdDisplay.textContent = `#${orderId}`;
+    useRecipeToggle.checked = false; // default: off
+    orderTraceabilityToggle.checked = false;
+    orderTraceabilityToggleRow.style.display = 'none';
+    orderTraceabilityHint.style.display = 'none';
+    useRecipeOverlay.classList.add('active');
+  }
+
+  function closeUseRecipePrompt() {
+    useRecipeOverlay.classList.remove('active');
+    pendingUnreceivedOrderId = null;
+  }
+
+  useRecipeCancelBtn.addEventListener('click', closeUseRecipePrompt);
+
+  useRecipeOverlay.addEventListener('click', (e) => {
+    if (e.target === useRecipeOverlay) closeUseRecipePrompt();
+  });
+
+  // --- Traceability toggle (only relevant when Use Recipe is on) ---
+  const orderTraceabilityToggle = document.getElementById('orderTraceabilityToggle');
+  const orderTraceabilityToggleRow = document.getElementById('orderTraceabilityToggleRow');
+  const orderTraceabilityHint = document.getElementById('orderTraceabilityHint');
+
+  useRecipeToggle.addEventListener('change', () => {
+    const show = useRecipeToggle.checked ? 'flex' : 'none';
+    orderTraceabilityToggleRow.style.display = show;
+    orderTraceabilityHint.style.display = useRecipeToggle.checked ? 'block' : 'none';
+    if (!useRecipeToggle.checked) orderTraceabilityToggle.checked = false;
+  });
+
+  useRecipeConfirmBtn.addEventListener('click', () => {
+    if (!pendingUnreceivedOrderId) return;
+
+    const orderId = pendingUnreceivedOrderId;
+    const useRecipe = useRecipeToggle.checked;
+    const traceability = useRecipe && orderTraceabilityToggle.checked;
+
+    const confirmMsg = useRecipe
+      ? `Search for matching recipes and execute them to produce order ${orderId}'s items?`
+      : `Subtract order ${orderId}'s items directly from stock?`;
+    if (!confirm(confirmMsg)) return;
+
+    if (traceability) {
+      openOrderTraceabilitySelection(orderId);
+      return;
+    }
+    submitProcessOrder(orderId, useRecipe, null);
+  });
+
+  // --- Order Traceability Selection Modal ---
+  const orderTraceabilityOverlay = document.getElementById('orderTraceabilityOverlay');
+  const orderTraceabilityWrap = document.getElementById('orderTraceabilityWrap');
+  const orderTraceabilityFormError = document.getElementById('orderTraceabilityFormError');
+  const orderTraceabilityCancelBtn = document.getElementById('orderTraceabilityCancelBtn');
+  const orderTraceabilityConfirmBtn = document.getElementById('orderTraceabilityConfirmBtn');
+
+  let orderTraceabilityContext = null; // { orderId, recipes }
+
+  function orderIngredientSelectedTotal(recipeIdx, pid) {
+    let total = 0;
+    orderTraceabilityWrap
+      .querySelectorAll(`.trace-batch-row[data-recipe-idx="${recipeIdx}"][data-pid="${pid}"] .trace-batch-qty`)
+      .forEach(input => { total += parseFloat(input.value) || 0; });
+    return total;
+  }
+
+  function updateOrderIngredientProgress(recipeIdx, pid) {
+    const recipe = orderTraceabilityContext.recipes[recipeIdx];
+    const ing = recipe.ingredients.find(i => String(i.pid) === String(pid));
+    const total = orderIngredientSelectedTotal(recipeIdx, pid);
+    const progressEl = orderTraceabilityWrap.querySelector(
+      `.trace-ingredient-progress[data-recipe-idx="${recipeIdx}"][data-pid="${pid}"]`
+    );
+    if (progressEl) {
+      progressEl.textContent = `${total} / ${ing.needed} selected`;
+      progressEl.classList.toggle('trace-progress-ok', total >= ing.needed);
+      progressEl.classList.toggle('trace-progress-short', total < ing.needed);
+    }
+  }
+
+  function renderOrderTraceabilityModal(recipes, orderId) {
+    orderTraceabilityContext = { orderId, recipes };
+    orderTraceabilityWrap.innerHTML = '';
+
+    recipes.forEach((recipe, recipeIdx) => {
+      const section = document.createElement('div');
+      section.className = 'trace-recipe-section';
+      section.innerHTML = `<h3 style="font-size:15px;margin:16px 0 8px;">${recipe.recipe_name} — ${recipe.runs} run(s)</h3>`;
+
+      recipe.ingredients.forEach(ing => {
+        const block = document.createElement('div');
+        block.className = 'trace-ingredient-block';
+        const uomSuffix = ing.uom ? ` ${ing.uom}` : '';
+
+        block.innerHTML = `
+          <div class="trace-ingredient-header">
+            <strong>${ing.name}</strong>
+            <span class="trace-ingredient-progress" data-recipe-idx="${recipeIdx}" data-pid="${ing.pid}">0 / ${ing.needed} selected</span>
+          </div>
+        `;
+
+        const table = document.createElement('table');
+        table.className = 'trace-batch-table';
+        table.innerHTML = `
+          <thead><tr><th></th><th>Location</th><th>Lot</th><th>Prod. Date</th><th>Exp. Date</th><th>Available</th><th>Use qty</th></tr></thead>
+          <tbody></tbody>
+        `;
+        const tbody = table.querySelector('tbody');
+
+        if (!ing.batches || ing.batches.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="color:#999;font-style:italic;">No stock batches available.</td></tr>`;
+        } else {
+          ing.batches.forEach(b => {
+            const tr = document.createElement('tr');
+            tr.className = 'trace-batch-row';
+            tr.dataset.recipeIdx = recipeIdx;
+            tr.dataset.pid = ing.pid;
+            tr.dataset.stockId = b.stock_id;
+            tr.innerHTML = `
+              <td><input type="checkbox" class="trace-batch-check"></td>
+              <td>${b.location || '-'}</td>
+              <td>${b.lot || '-'}</td>
+              <td>${b.production_date || '-'}</td>
+              <td>${b.expiration_date || '-'}</td>
+              <td>${b.quantity}${uomSuffix}</td>
+              <td><input type="number" class="trace-batch-qty" min="0" max="${b.quantity}" step="any" value="0" disabled></td>
+            `;
+            const checkbox = tr.querySelector('.trace-batch-check');
+            const qtyInput = tr.querySelector('.trace-batch-qty');
+
+            checkbox.addEventListener('change', () => {
+              qtyInput.disabled = !checkbox.checked;
+              qtyInput.value = checkbox.checked ? b.quantity : 0;
+              updateOrderIngredientProgress(recipeIdx, ing.pid);
+            });
+            qtyInput.addEventListener('input', () => {
+              let val = parseFloat(qtyInput.value) || 0;
+              if (val > b.quantity) val = b.quantity;
+              if (val < 0) val = 0;
+              qtyInput.value = val;
+              updateOrderIngredientProgress(recipeIdx, ing.pid);
+            });
+
+            tbody.appendChild(tr);
+          });
+        }
+
+        block.appendChild(table);
+        section.appendChild(block);
+      });
+
+      orderTraceabilityWrap.appendChild(section);
+    });
+
+    orderTraceabilityFormError.style.display = 'none';
+    orderTraceabilityOverlay.classList.add('active');
+  }
+
+  async function openOrderTraceabilitySelection(orderId) {
+    try {
+      const response = await fetch('/preview_order_recipe_ingredients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId })
+      });
+      const data = await response.json();
+      if (!data.success) {
+        alert(data.message || 'Could not load recipe/ingredient stock for this order.');
+        return;
+      }
+      if (!data.recipes || data.recipes.length === 0) {
+        alert('No recipe matches were found for this order — proceeding without traceability selection.');
+        submitProcessOrder(orderId, true, null);
+        return;
+      }
+      renderOrderTraceabilityModal(data.recipes, orderId);
+    } catch (err) {
+      console.error(err);
+      alert('Something went wrong while loading ingredient stock for this order.');
+    }
+  }
+
+  orderTraceabilityCancelBtn.addEventListener('click', () => {
+    orderTraceabilityOverlay.classList.remove('active');
+    orderTraceabilityContext = null;
+  });
+  orderTraceabilityOverlay.addEventListener('click', (e) => {
+    if (e.target === orderTraceabilityOverlay) {
+      orderTraceabilityOverlay.classList.remove('active');
+      orderTraceabilityContext = null;
+    }
+  });
+
+  orderTraceabilityConfirmBtn.addEventListener('click', () => {
+    if (!orderTraceabilityContext) return;
+
+    const { orderId, recipes } = orderTraceabilityContext;
+    const recipeSelections = [];
+    let allCovered = true;
+
+    recipes.forEach((recipe, recipeIdx) => {
+      const selectedStock = [];
+      recipe.ingredients.forEach(ing => {
+        const total = orderIngredientSelectedTotal(recipeIdx, ing.pid);
+        if (total < ing.needed) allCovered = false;
+
+        orderTraceabilityWrap
+          .querySelectorAll(`.trace-batch-row[data-recipe-idx="${recipeIdx}"][data-pid="${ing.pid}"]`)
+          .forEach(row => {
+            const qty = parseFloat(row.querySelector('.trace-batch-qty').value) || 0;
+            if (qty > 0) {
+              selectedStock.push({ pid: ing.pid, stock_id: parseInt(row.dataset.stockId, 10), quantity: qty });
+            }
+          });
+      });
+
+      recipeSelections.push({
+        recipe_id: recipe.recipe_id, order_pid: recipe.order_pid,
+        runs: recipe.runs, selected_stock: selectedStock
+      });
+    });
+
+    if (!allCovered) {
+      orderTraceabilityFormError.style.display = 'block';
+      return;
+    }
+    orderTraceabilityFormError.style.display = 'none';
+
+    orderTraceabilityOverlay.classList.remove('active');
+    orderTraceabilityContext = null;
+    submitProcessOrder(orderId, true, recipeSelections);
+  });
+
+  // --- Shared submit for process_unreceived_order ---
+  function submitProcessOrder(orderId, useRecipe, recipeSelections) {
+    const payload = { order_id: orderId, use_recipe: useRecipe };
+    if (recipeSelections) payload.recipe_selections = recipeSelections;
+
+    fetch('/process_unreceived_order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(response => response.json().then(data => ({ ok: response.ok, data })))
+      .then(({ ok, data }) => {
+        if (!ok || !data.success) {
+          if (data && data.insufficient) {
+            const lines = (data.items || []).map(
+              i => `${i.name}: need ${i.needed}${i.uom ? ' ' + i.uom : ''}, have ${i.available}${i.uom ? ' ' + i.uom : ''}`
+            ).join('\n');
+            alert(`Not enough stock to complete this order:\n${lines || 'See recipe ingredient shortages.'}`);
+          } else {
+            alert((data && data.message) || 'Failed to process order.');
+          }
+          return;
+        }
+        alert(data.message || `Order ${orderId} processed successfully!`);
+        closeUseRecipePrompt();
+        syncOverlay.classList.remove('active');
+        window.location.reload();
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Something went wrong while processing the order.');
+      });
+  }
+
+  // Sync search filter
+  const syncSearchInput = document.getElementById('sync-search-input');
+  syncSearchInput.addEventListener('input', () => {
+    const term = syncSearchInput.value.trim().toLowerCase();
+    const rows = syncOrdersBody.querySelectorAll('tr.sync-order-row');
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+    });
+  });
+
+  // Sync orders sort (defaults to Date - Newest First when nothing is chosen)
+  const syncSortSelect = document.getElementById('sync-sort-select');
+
+  function sortSyncOrders() {
+    const sortValue = syncSortSelect.value || 'date_desc';
+    const rows = Array.from(syncOrdersBody.querySelectorAll('tr.sync-order-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'name_asc' || sortValue === 'name_desc') {
+        const nameA = (a.dataset.customer || '').toLowerCase();
+        const nameB = (b.dataset.customer || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortValue === 'name_asc' ? cmp : -cmp;
+      } else {
+        const timeA = Date.parse(a.dataset.date) || 0;
+        const timeB = Date.parse(b.dataset.date) || 0;
+        return sortValue === 'date_asc' ? timeA - timeB : timeB - timeA;
+      }
+    });
+
+    rows.forEach(row => syncOrdersBody.appendChild(row));
+  }
+
+  syncSortSelect.addEventListener('change', sortSyncOrders);
+
+  // Apply the default sort (Date - Newest First) as soon as the page loads
+  sortSyncOrders();
+
+  // --- Generic Field Modal (modified to accept pid) ---
+  const fieldOverlay = document.getElementById('fieldOverlay');
+  const fieldCloseBtn = document.getElementById('fieldCloseBtn');
+  const fieldTableBody = document.getElementById('fieldTableBody');
+  const fieldModalTitle = document.getElementById('fieldModalTitle');
+  const fieldCol1 = document.getElementById('fieldCol1');
+
+  fieldCloseBtn.addEventListener('click', () => {
+    fieldOverlay.classList.remove('active');
+  });
+
+  fieldOverlay.addEventListener('click', (e) => {
+    if (e.target === fieldOverlay) fieldOverlay.classList.remove('active');
+  });
+
+  // Mapping from field name to display label and backend parameter
+  const fieldDisplayMap = {
+    'location': { label: 'Location', param: 'location' },
+    'production_date': { label: 'Production Date', param: 'production_date' },
+    'expiration_date': { label: 'Expiration Date', param: 'expiration_date' },
+    'invoice_number': { label: 'Invoice Number', param: 'invoice_number' }
+  };
+
+  // Store current modal context for refresh after delete
+  let currentModalContext = { field: null, value: null, extra: null, isLot: false };
+
+  // CHANGED: openFieldModal now uses pid if provided in extra
+  function openFieldModal(field, value, extra) {
+    const isLot = (field === 'lot');
+    let title, col1Header, fetchUrl;
+
+    if (isLot) {
+      title = `LOT Numbers - ${extra.productName}`;
+      col1Header = 'LOT Number';
+      fetchUrl = `/get_lots?pid=${encodeURIComponent(extra.pid)}`;
+    } else {
+      const display = fieldDisplayMap[field];
+      if (!display) return;
+      // If we have a pid, show product name in title and fetch by pid
+      const productName = (extra && extra.pid) ? ` for ${extra.productName || 'Product'}` : '';
+      const displayValue = value || '(empty)';
+      title = `${display.label}${productName}`;
+      col1Header = display.label;
+      if (extra && extra.pid) {
+        // Fetch all items for this product, ignoring the value filter
+        fetchUrl = `/get_field_stock?field=${encodeURIComponent(display.param)}&pid=${encodeURIComponent(extra.pid)}`;
+      } else {
+        // Original behaviour: filter by value
+        fetchUrl = `/get_field_stock?field=${encodeURIComponent(display.param)}&value=${encodeURIComponent(value)}`;
+      }
+    }
+
+    // Save context for refresh
+    currentModalContext = { field, value, extra, isLot };
+
+    fieldModalTitle.textContent = title;
+    fieldCol1.textContent = col1Header;
+    fieldTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Loading...</td></tr>';
+    fieldOverlay.classList.add('active');
+
+    fetch(fetchUrl)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch data');
+        return response.json();
+      })
+      .then(data => {
+        fieldTableBody.innerHTML = '';
+        let items = [];
+        if (isLot) {
+          items = data.lots || [];
+        } else {
+          items = data.items || [];
+        }
+        if (items.length === 0) {
+          fieldTableBody.innerHTML = '<tr class="no-items-row"><td colspan="4">No items found</td></tr>';
+          return;
+        }
+        items.forEach(item => {
+          const tr = document.createElement('tr');
+          const fieldValue = isLot ? (item.lot || '-') : (item.field_value || '-');
+          const oidDisplay = item.oid || '-';
+          const stockId = item.stock_id || '';
+          tr.innerHTML = `
+            <td>${fieldValue}</td>
+            <td>${item.quantity || '-'}</td>
+            <td>${oidDisplay}</td>
+            <td>
+              <button class="delete-stock-btn" data-stock-id="${stockId}" title="Delete this item">🗑️</button>
+            </td>
+          `;
+          fieldTableBody.appendChild(tr);
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        fieldTableBody.innerHTML = '<tr class="no-items-row"><td colspan="4">Error loading data</td></tr>';
+      });
+  }
+
+  // --- Event listener for delete buttons inside the field modal (delegated) ---
+  fieldTableBody.addEventListener('click', (e) => {
+    const deleteBtn = e.target.closest('.delete-stock-btn');
+    if (deleteBtn) {
+      e.stopPropagation();
+      const stockId = deleteBtn.dataset.stockId;
+      if (stockId) {
+        deleteStockItemFromModal(stockId);
+      } else {
+        alert('Stock ID missing for this item');
+      }
+    }
+  });
+
+  // --- Refresh modal content after delete ---
+  function refreshModalContent() {
+    const { field, value, extra, isLot } = currentModalContext;
+    if (isLot) {
+      const pid = extra ? extra.pid : null;
+      if (!pid) return;
+      const fetchUrl = `/get_lots?pid=${encodeURIComponent(pid)}`;
+      fieldTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Loading...</td></tr>';
+      fetch(fetchUrl)
+        .then(response => response.json())
+        .then(data => {
+          fieldTableBody.innerHTML = '';
+          const items = data.lots || [];
+          if (items.length === 0) {
+            fieldTableBody.innerHTML = '<tr class="no-items-row"><td colspan="4">No items found</td></tr>';
+            return;
+          }
+          items.forEach(item => {
+            const tr = document.createElement('tr');
+            const fieldValue = item.lot || '-';
+            const oidDisplay = item.oid || '-';
+            const stockId = item.stock_id || '';
+            tr.innerHTML = `
+              <td>${fieldValue}</td>
+              <td>${item.quantity || '-'}</td>
+              <td>${oidDisplay}</td>
+              <td>
+                <button class="delete-stock-btn" data-stock-id="${stockId}" title="Delete this item">🗑️</button>
+              </td>
+            `;
+            fieldTableBody.appendChild(tr);
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          fieldTableBody.innerHTML = '<tr class="no-items-row"><td colspan="4">Error loading data</td></tr>';
+        });
+    } else {
+      const display = fieldDisplayMap[field];
+      if (!display) return;
+      // Re-fetch using the same method as openFieldModal
+      let fetchUrl;
+      if (extra && extra.pid) {
+        fetchUrl = `/get_field_stock?field=${encodeURIComponent(display.param)}&pid=${encodeURIComponent(extra.pid)}`;
+      } else {
+        fetchUrl = `/get_field_stock?field=${encodeURIComponent(display.param)}&value=${encodeURIComponent(value)}`;
+      }
+      fieldTableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#999;padding:24px;">Loading...</td></tr>';
+      fetch(fetchUrl)
+        .then(response => response.json())
+        .then(data => {
+          fieldTableBody.innerHTML = '';
+          const items = data.items || [];
+          if (items.length === 0) {
+            fieldTableBody.innerHTML = '<tr class="no-items-row"><td colspan="4">No items found</td></tr>';
+            return;
+          }
+          items.forEach(item => {
+            const tr = document.createElement('tr');
+            const fieldValue = item.field_value || '-';
+            const oidDisplay = item.oid || '-';
+            const stockId = item.stock_id || '';
+            tr.innerHTML = `
+              <td>${fieldValue}</td>
+              <td>${item.quantity || '-'}</td>
+              <td>${oidDisplay}</td>
+              <td>
+                <button class="delete-stock-btn" data-stock-id="${stockId}" title="Delete this item">🗑️</button>
+              </td>
+            `;
+            fieldTableBody.appendChild(tr);
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          fieldTableBody.innerHTML = '<tr class="no-items-row"><td colspan="4">Error loading data</td></tr>';
+        });
+    }
+  }
+
+  // --- Delete from modal (kept for field modal delete) ---
+  function deleteStockItemFromModal(stockId) {
+    if (!confirm('Delete this stock item permanently? This cannot be undone.')) return;
+
+    fetch('/delete_stock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stock_id: stockId })
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          refreshModalContent();
+          const mainRow = document.querySelector(`tr.stock-row[data-stock-id="${stockId}"]`);
+          if (mainRow) {
+            mainRow.remove();
+            toggleNoProductsRow();
+          }
+        } else {
+          alert(data.error || 'Failed to delete stock item');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Error deleting stock item');
+      });
+  }
+
+  // --- Event listeners for field buttons and LOT buttons (delegated on the main table body) ---
+  const productsTableBody = document.getElementById('productsTableBody');
+
+  productsTableBody.addEventListener('click', (e) => {
+    // Handle field buttons (Location, Production Date, Expiration Date, Invoice Number)
+    const fieldBtn = e.target.closest('.field-btn');
+    if (fieldBtn) {
+      e.stopPropagation();
+      const field = fieldBtn.dataset.field;
+      const value = fieldBtn.dataset.value;
+      const pid = fieldBtn.dataset.pid; // CHANGED: get pid
+      // Pass pid in extra (productName can be empty for now)
+      openFieldModal(field, value, { pid: pid, productName: '' });
+      return;
+    }
+
+    // Handle LOT buttons
+    const lotBtn = e.target.closest('.lot-btn');
+    if (lotBtn) {
+      e.stopPropagation();
+      const pid = lotBtn.dataset.pid;
+      const name = lotBtn.dataset.name;
+      openFieldModal('lot', null, { pid: pid, productName: name });
+      return;
+    }
+
+    // Handle Edit button
+    const editBtn = e.target.closest('.edit-btn');
+    if (editBtn) {
+      e.stopPropagation();
+      const row = e.target.closest('.stock-row');
+      const pid = row ? row.dataset.pid : null;
+      const productName = row ? row.querySelector('td').textContent.trim() : '';
+      if (!pid) {
+        alert('Missing product reference for this row.');
+        return;
+      }
+      openEditPidPicker(pid, productName);
+    }
+  });
+
+  // --- Edit Entry Picker Logic (lists every individual stock row for the clicked product) ---
+  const editOrderOverlay = document.getElementById('editOrderOverlay');
+  const editOrderCancelBtn = document.getElementById('editOrderCancelBtn');
+  const editOrdersBody = document.getElementById('editOrdersBody');
+  const editOrderSearchInput = document.getElementById('edit-order-search-input');
+  const editPickerTitle = document.getElementById('editPickerTitle');
+
+  function openEditPidPicker(pid, productName) {
+    editPickerTitle.textContent = productName
+      ? `Select which entry to edit — ${productName}`
+      : 'Select which entry to edit';
+    editOrderOverlay.classList.add('active');
+    editOrdersBody.innerHTML = '<tr class="no-orders-row"><td colspan="7">Loading items...</td></tr>';
+
+    fetch(`/get_stock_by_pid?pid=${encodeURIComponent(pid)}`)
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to fetch stock items');
+        return response.json();
+      })
+      .then(data => {
+        editOrdersBody.innerHTML = '';
+        if (!data || data.length === 0) {
+          editOrdersBody.innerHTML = '<tr class="no-orders-row"><td colspan="7">No stock entries found</td></tr>';
+          return;
+        }
+        data.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.className = 'sync-order-row';
+          tr.dataset.stockId = item.id;
+          tr.innerHTML = `
+            <td>${item.quantity}</td>
+            <td>${item.location || '-'}</td>
+            <td>${item.production_date || '-'}</td>
+            <td>${item.expiration_date || '-'}</td>
+            <td>${item.invoice_number || '-'}</td>
+            <td>${item.lot || '-'}</td>
+            <td>${item.oid || '-'}</td>
+          `;
+          editOrdersBody.appendChild(tr);
+        });
+      })
+      .catch(err => {
+        console.error(err);
+        editOrdersBody.innerHTML = '<tr class="no-orders-row"><td colspan="7">Error loading items</td></tr>';
+      });
+  }
+
+  editOrderCancelBtn.addEventListener('click', () => {
+    editOrderOverlay.classList.remove('active');
+  });
+
+  editOrderOverlay.addEventListener('click', (e) => {
+    if (e.target === editOrderOverlay) editOrderOverlay.classList.remove('active');
+  });
+
+  editOrderSearchInput.addEventListener('input', () => {
+    const term = editOrderSearchInput.value.trim().toLowerCase();
+    const rows = editOrdersBody.querySelectorAll('tr.sync-order-row');
+    rows.forEach(row => {
+      const matches = !term || row.textContent.toLowerCase().includes(term);
+      row.style.display = matches ? '' : 'none';
+    });
+  });
+
+  editOrdersBody.addEventListener('click', (e) => {
+    const row = e.target.closest('.sync-order-row');
+    if (!row) return;
+    const stockId = row.dataset.stockId;
+    if (!stockId) return;
+    editOrderOverlay.classList.remove('active');
+    openEditSingleItem(stockId);
+  });
+
+  // --- Edit Single Stock Item Logic (form for the one entry chosen above) ---
+  const editStockItemsOverlay = document.getElementById('editStockItemsOverlay');
+  const editStockItemsCancelBtn = document.getElementById('editStockItemsCancelBtn');
+  const editStockItemsSaveBtn = document.getElementById('editStockItemsSaveBtn');
+  const editItemProductName = document.getElementById('editItemProductName');
+  const editItemQuantity = document.getElementById('editItemQuantity');
+  const editItemLocation = document.getElementById('editItemLocation');
+  const editItemProductionDate = document.getElementById('editItemProductionDate');
+  const editItemExpirationDate = document.getElementById('editItemExpirationDate');
+  const editItemInvoiceNumber = document.getElementById('editItemInvoiceNumber');
+  const editItemLot = document.getElementById('editItemLot');
+
+  let currentEditingStockId = null;
+
+  function openEditSingleItem(stockId) {
+    currentEditingStockId = stockId;
+    editStockItemsOverlay.classList.add('active');
+    editItemProductName.textContent = '';
+    [editItemQuantity, editItemLocation, editItemProductionDate,
+     editItemExpirationDate, editItemInvoiceNumber, editItemLot].forEach(el => el.value = '');
+
+    fetch(`/get_stock_item?stock_id=${encodeURIComponent(stockId)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (!data.success) {
+          alert(data.error || 'Failed to load stock item');
+          editStockItemsOverlay.classList.remove('active');
+          return;
+        }
+        editItemQuantity.value = data.quantity ?? '';
+        editItemLocation.value = data.location || '';
+        editItemProductionDate.value = data.rdate || '';
+        editItemExpirationDate.value = data.edate || '';
+        editItemInvoiceNumber.value = data.invoicen || '';
+        editItemLot.value = data.lot || '';
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Error loading stock item');
+        editStockItemsOverlay.classList.remove('active');
+      });
+  }
+
+  editStockItemsCancelBtn.addEventListener('click', () => {
+    editStockItemsOverlay.classList.remove('active');
+  });
+
+  editStockItemsOverlay.addEventListener('click', (e) => {
+    if (e.target === editStockItemsOverlay) editStockItemsOverlay.classList.remove('active');
+  });
+
+  editStockItemsSaveBtn.addEventListener('click', () => {
+    if (!currentEditingStockId) return;
+
+    const quantity = parseInt(editItemQuantity.value, 10);
+
+    const payload = {
+      stock_id: currentEditingStockId,
+      quantity: isNaN(quantity) ? null : quantity,
+      location: editItemLocation.value,
+      production_date: editItemProductionDate.value,
+      expiration_date: editItemExpirationDate.value,
+      invoice_number: editItemInvoiceNumber.value,
+      lot: editItemLot.value
+    };
+
+    fetch('/update_stock_item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(response => {
+        if (!response.ok) throw new Error('Failed to update stock item');
+        return response.json();
+      })
+      .then(data => {
+        if (data.success) {
+          editStockItemsOverlay.classList.remove('active');
+          window.location.reload();
+        } else {
+          alert(data.error || 'Update failed');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert('Error updating stock item');
+      });
+  });
+
+  // --- Helper to toggle "No products" row ---
+  function toggleNoProductsRow() {
+    const hasRows = productsTableBody.querySelectorAll('tr.stock-row').length > 0;
+    let noProductsRow = document.getElementById('no-products-row');
+
+    if (!hasRows && !noProductsRow) {
+      noProductsRow = document.createElement('tr');
+      noProductsRow.className = 'no-products-row';
+      noProductsRow.id = 'no-products-row';
+      noProductsRow.innerHTML = '<td colspan="10">No products in stock</td>';
+      productsTableBody.appendChild(noProductsRow);
+    } else if (hasRows && noProductsRow) {
+      noProductsRow.remove();
+    }
+  }
+
+  // --- Location filter dropdown for stock table ---
+  const stockLocationFilter = document.getElementById('stock-location-filter');
+
+  function populateLocationFilter() {
+    const rows = productsTableBody.querySelectorAll('tr.stock-row');
+    const locations = new Set();
+    rows.forEach(row => {
+      const loc = (row.dataset.location || '').trim();
+      if (loc && loc !== '-') {
+        locations.add(loc);
+      }
+    });
+
+    const sortedLocations = Array.from(locations).sort((a, b) => a.localeCompare(b));
+    // Keep the "All Locations" option, remove any previously injected options
+    stockLocationFilter.querySelectorAll('option:not([value=""])').forEach(opt => opt.remove());
+    sortedLocations.forEach(loc => {
+      const option = document.createElement('option');
+      option.value = loc;
+      option.textContent = loc;
+      stockLocationFilter.appendChild(option);
+    });
+  }
+
+  // --- Search bar + location filter for stock table (combined) ---
+  const stockSearchInput = document.getElementById('stockSearchInput');
+
+  function applyStockFilters() {
+    const term = stockSearchInput.value.trim().toLowerCase();
+    const selectedLocation = stockLocationFilter.value;
+    const rows = productsTableBody.querySelectorAll('tr.stock-row');
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      const matchesSearch = !term || text.includes(term);
+      const matchesLocation = !selectedLocation || row.dataset.location === selectedLocation;
+      row.style.display = matchesSearch && matchesLocation ? '' : 'none';
+    });
+  }
+
+  stockSearchInput.addEventListener('input', applyStockFilters);
+  stockLocationFilter.addEventListener('change', applyStockFilters);
+
+  populateLocationFilter();
+
+  // --- Sort dropdown for stock table (defaults to Production Date - Newest First) ---
+  const stockSortSelect = document.getElementById('stock-sort-select');
+
+  function sortStockRows() {
+    const sortValue = stockSortSelect.value || 'date_desc';
+    const rows = Array.from(productsTableBody.querySelectorAll('tr.stock-row'));
+    if (rows.length === 0) return;
+
+    rows.sort((a, b) => {
+      if (sortValue === 'name_asc' || sortValue === 'name_desc') {
+        const nameA = (a.dataset.name || '').toLowerCase();
+        const nameB = (b.dataset.name || '').toLowerCase();
+        const cmp = nameA.localeCompare(nameB);
+        return sortValue === 'name_asc' ? cmp : -cmp;
+      } else if (sortValue === 'expiration_asc' || sortValue === 'expiration_desc') {
+        const timeA = Date.parse(a.dataset.expirationDate) || 0;
+        const timeB = Date.parse(b.dataset.expirationDate) || 0;
+        return sortValue === 'expiration_asc' ? timeA - timeB : timeB - timeA;
+      } else {
+        const timeA = Date.parse(a.dataset.productionDate) || 0;
+        const timeB = Date.parse(b.dataset.productionDate) || 0;
+        return sortValue === 'date_asc' ? timeA - timeB : timeB - timeA;
+      }
+    });
+
+    rows.forEach(row => productsTableBody.appendChild(row));
+  }
+
+  stockSortSelect.addEventListener('change', sortStockRows);
+
+  // Apply the default sort (Production Date - Newest First) as soon as the page loads
+  sortStockRows();
+</script>
+
+{% endblock %}

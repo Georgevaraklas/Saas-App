@@ -1,0 +1,188 @@
+{% extends "layout.html" %}
+
+{% block title %}Help Center{% endblock %}
+
+{% block styles %}
+<style>
+  .help-page {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+  }
+
+  /* ---- Sidebar ---- */
+  .help-sidebar {
+    width: 260px;
+    flex: 0 0 260px;
+    padding: 20px 12px;
+    border-right: 1px solid #eee;
+    box-sizing: border-box;
+  }
+
+  .help-search {
+    position: relative;
+    margin-bottom: 20px;
+  }
+  .help-search input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 14px;
+    box-sizing: border-box;
+    background: #fafafa;
+  }
+  .help-search input:focus {
+    outline: none;
+    border-color: #bbb;
+    background: #fff;
+  }
+  .help-search svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    color: #999;
+  }
+
+  .help-section-title {
+    text-transform: uppercase;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #9a9a9a;
+    margin: 18px 8px 6px;
+  }
+  .help-sidebar > .help-section-title:first-of-type {
+    margin-top: 4px;
+  }
+
+  .help-nav {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .help-nav li a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 8px;
+    border-radius: 6px;
+    color: #333;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .help-nav li a:hover {
+    background: #f3f3f3;
+  }
+  .help-nav li.active a {
+    background: #eef1fb;
+    color: #2952e3;
+    font-weight: 600;
+  }
+  .help-nav li.active a .chevron {
+    color: #2952e3;
+  }
+  .help-nav li a .chevron {
+    color: #bbb;
+    font-size: 14px;
+    line-height: 1;
+  }
+  .help-nav.support-nav li a {
+    color: #6b6b6b;
+  }
+
+  /* ---- Content pane ---- */
+  .help-content {
+    flex: 1;
+    padding: 28px 36px;
+  }
+  .help-content h2 {
+    margin-top: 0;
+  }
+  .help-content p {
+    color: #666;
+  }
+
+  @media (max-width: 700px) {
+    .help-page {
+      flex-direction: column;
+    }
+    .help-sidebar {
+      width: 100%;
+      flex: none;
+      border-right: none;
+      border-bottom: 1px solid #eee;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block main %}
+<div class="help-page">
+
+  <!-- HELP SIDEBAR -->
+  <aside class="help-sidebar">
+    <div class="help-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"></circle>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      </svg>
+      <input type="text" id="helpSearchInput" placeholder="Search">
+    </div>
+
+    <div class="help-section-title">Help Center</div>
+    <ul class="help-nav" id="helpNav">
+      <li class="active"><a href="/help/get-started" data-page="/help/get-started">Get Started <span class="chevron">&#8250;</span></a></li>
+      <li><a href="/help/tutorials" data-page="/help/tutorials">Tutorials <span class="chevron">&#8250;</span></a></li>
+      <li><a href="/help/workspace-basics" data-page="/help/workspace-basics">Workspace Basics <span class="chevron">&#8250;</span></a></li>
+      <li><a href="/help/how-to" data-page="/help/how-to">How To <span class="chevron">&#8250;</span></a></li>
+    </ul>
+
+    <div class="help-section-title">Support</div>
+    <ul class="help-nav support-nav">
+      <li><a href="/help/chat">Chat with us</a></li>
+    </ul>
+  </aside>
+
+  <!-- HELP CONTENT -->
+  <section class="help-content">
+    <h2>Get Started</h2>
+    <p>Welcome! This is where you'll find the basics for getting up and running — creating your account, setting up your workspace, and finding your way around.</p>
+  </section>
+
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    let currentPath = window.location.pathname;
+    if (currentPath.length > 1 && currentPath.endsWith('/')) {
+      currentPath = currentPath.slice(0, -1);
+    }
+
+    const helpNav = document.getElementById('helpNav');
+    const links = helpNav.querySelectorAll('a[data-page]');
+    let matched = false;
+
+    links.forEach(a => {
+      helpNav.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+    });
+
+    links.forEach(a => {
+      if (a.dataset.page === currentPath) {
+        a.closest('li').classList.add('active');
+        matched = true;
+      }
+    });
+
+    // Default to "Get Started" whenever the URL doesn't match a specific row
+    // (e.g. landing on /help itself)
+    if (!matched) {
+      const getStartedLink = helpNav.querySelector('a[data-page="/help/get-started"]');
+      if (getStartedLink) getStartedLink.closest('li').classList.add('active');
+    }
+  });
+</script>
+{% endblock %}

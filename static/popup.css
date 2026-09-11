@@ -1,0 +1,92 @@
+  .popup-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 1060; /* above Bootstrap's default modal z-index of 1055 */
+  }
+
+  .popup-overlay.active {
+    display: flex;
+  }
+
+  .popup-modal {
+    background: white;
+    padding: 24px;
+    border-radius: 10px;
+    width: 300px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  }
+
+  .popup-modal h2 {
+    margin-top: 0;
+    font-size: 18px;
+  }
+
+  .popup-modal label {
+    display: block;
+    margin: 12px 0 4px;
+    font-size: 14px;
+    color: #333;
+  }
+
+  .popup-modal input {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+
+  .popup-modal-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .popup-modal-actions button {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .popup-cancel-btn {
+    background: #e5e5e5;
+  }
+
+  .popup-save-btn {
+    background: #0b1215;
+    color: white;
+  }
+
+    select {
+    width: 100%;
+    max-width: 320px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+    color: #333;
+    background-color: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    cursor: pointer;
+  }
+
+  select:focus {
+    outline: none;
+    border-color: #9ca3af;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05);
+  }

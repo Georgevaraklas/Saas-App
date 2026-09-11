@@ -157,7 +157,7 @@ def close_postgres_connection(exception=None):
         conn.close()
 
 # Company logo uploads (shown on signup and printed on invoices)
-app.config["LOGO_UPLOAD_FOLDER"] = os.path.join(app.root_path, "static", "uploads", "logos")
+app.config["LOGO_UPLOAD_FOLDER"] = "/tmp/uploads"
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB cap on uploaded requests
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 os.makedirs(app.config["LOGO_UPLOAD_FOLDER"], exist_ok=True)

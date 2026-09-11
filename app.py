@@ -39,7 +39,6 @@ import json
 import tempfile
 import magic
 import pdf2image
-from paddleocr import PaddleOCR
 import numpy as np
 from math import ceil
 import requests
@@ -739,6 +738,7 @@ def parse_date_to_int(date_str):
         return None
 
 
+from paddleocr import PaddleOCR
 _ocr_engine = None
 def get_ocr():
     global _ocr_engine

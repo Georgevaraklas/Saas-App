@@ -169,6 +169,32 @@
       width: 420px;
       max-width: 92vw;
     }
+    #newAlertModal.open .modal-box {
+      animation: newAlertModalPop 0.22s ease;
+    }
+    #newAlertModal.closing .modal-box {
+      animation: newAlertModalPopOut 0.18s ease forwards;
+    }
+    @keyframes newAlertModalPop {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    @keyframes newAlertModalPopOut {
+      from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+      }
+    }
 
     .section-label {
       font-size: 13px;
@@ -266,7 +292,7 @@
       border-radius: 6px;
       font-size: 13px;
       box-sizing: border-box;
-      background: #fff;
+      background: #fff !important;
       text-align: left;
       cursor: pointer;
       display: flex;
@@ -860,17 +886,30 @@
     alertFormError.classList.remove('show');
   }
 
+  const newModalBox = newModal.querySelector('.modal-box');
+
+  function closeNewAlertModal() {
+    if (!newModal.classList.contains('open') || newModal.classList.contains('closing')) return;
+    newModal.classList.add('closing');
+  }
+
+  newModalBox.addEventListener('animationend', (e) => {
+    if (e.target === newModalBox && newModal.classList.contains('closing')) {
+      newModal.classList.remove('open', 'closing');
+    }
+  });
+
   openNewBtn.addEventListener('click', () => {
     resetNewAlertForm();
     newModal.classList.add('open');
   });
 
   cancelNewBtn.addEventListener('click', () => {
-    newModal.classList.remove('open');
+    closeNewAlertModal();
   });
 
   newModal.addEventListener('click', (e) => {
-    if (e.target === newModal) newModal.classList.remove('open');
+    if (e.target === newModal) closeNewAlertModal();
   });
 
   alertForm.addEventListener('submit', (e) => {

@@ -14,7 +14,7 @@ import io
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
-from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, Blueprint, send_file, send_from_directory, abort, g
+from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, Blueprint, send_file, abort, g, Response
 from flask_limiter import Limiter
 from app_options import LANGUAGES, CURRENCIES, VALID_LANGUAGE_CODES, VALID_CURRENCY_CODES
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -27,18 +27,15 @@ from pypdf.errors import PdfReadError
 
 from security import scan_file_with_cloudmersive, scan_image_with_cloudmersive
 import logging
-from logging.handlers import RotatingFileHandler
 from errors import AppError, NotFoundError, ValidationError, OwnershipError, wants_json, AuthError, json_route
 
 import requests
 from functools import wraps
+from contextlib import contextmanager
 import random
 import string 
 import json
 import tempfile
-import magic
-import pdf2image
-import numpy as np
 from math import ceil
 import requests
 import csv
@@ -64,18 +61,23 @@ except ImportError:
     SimpleDocTemplate = None
 
 # Configure application
-app = Flask(__name__)
-app.secret_key = 'bestappknownever694201108'
-
 load_dotenv()  # Load environment variables from .env file
+
+app = Flask(__name__)
+FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY")
+if not FLASK_SECRET_KEY:
+    raise RuntimeError("FLASK_SECRET_KEY is not set. Add it to your environment variables.")
+app.secret_key = FLASK_SECRET_KEY
 
 # Currency Filtering
 register_currency_filter(app)
 
-# Configure session to use filesystem (instead of signed cookies)
+# Configure secure signed-cookie sessions
 app.config["SESSION_COOKIE_SECURE"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+_original_static_view = app.view_functions.get("static")
 
 # Configure PostgreSQL database (Supabase)
 # Put your Supabase PostgreSQL connection string in .env as DATABASE_URL.
@@ -139,11 +141,25 @@ class PostgresDB:
                     return rows
 
                 affected = cursor.rowcount
-                conn.commit()
+                if not getattr(g, "postgres_db_in_transaction", False):
+                    conn.commit()
                 return affected
         except Exception:
             conn.rollback()
             raise
+
+    @contextmanager
+    def transaction(self):
+        conn=self._connection()
+        if getattr(g,"postgres_db_in_transaction",False):
+            yield; return
+        g.postgres_db_in_transaction=True
+        try:
+            yield; conn.commit()
+        except Exception:
+            conn.rollback(); raise
+        finally:
+            g.postgres_db_in_transaction=False
 
 
 db = PostgresDB()
@@ -155,22 +171,85 @@ def close_postgres_connection(exception=None):
     if conn is not None:
         conn.close()
 
-# Company logo uploads (shown on signup and printed on invoices)
+# Uploaded files are stored in Supabase Storage. Vercel's deployment filesystem is read-only.
 app.config["LOGO_UPLOAD_FOLDER"] = "/tmp/uploads"
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB cap on uploaded requests
+app.config["PRODUCT_MEDIA_UPLOAD_FOLDER"] = "/tmp/product_uploads"
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024
 ALLOWED_LOGO_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
-os.makedirs(app.config["LOGO_UPLOAD_FOLDER"], exist_ok=True)
-
+ALLOWED_PRODUCT_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+ALLOWED_PRODUCT_IMAGE_FIELDS = {"barcode", "qrcode", "picture"}
 Image.MAX_IMAGE_PIXELS = 25_000_000
-
 MAX_PDF_PAGES = 10
 
-# Image Uploads
-app.config["PRODUCT_MEDIA_UPLOAD_FOLDER"] = os.path.join(app.root_path, "static", "uploads", "products")
-os.makedirs(app.config["PRODUCT_MEDIA_UPLOAD_FOLDER"], exist_ok=True)
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "uploads")
 
-ALLOWED_PRODUCT_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
-ALLOWED_PRODUCT_IMAGE_FIELDS = {"barcode", "qrcode", "picture"}  # matches the 3 slots in the modal
+def _supabase_project_url_from_database_url(database_url):
+    try:
+        from urllib.parse import urlparse
+        host = urlparse(database_url).hostname or ""
+        if host.startswith("db.") and host.endswith(".supabase.co"):
+            ref = host[3:-len(".supabase.co")]
+            if ref: return f"https://{ref}.supabase.co"
+    except Exception: pass
+    return None
+if not SUPABASE_URL: SUPABASE_URL = _supabase_project_url_from_database_url(DATABASE_URL)
+
+def _storage_headers(content_type=None):
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        raise RuntimeError("Supabase Storage is not configured. Set SUPABASE_URL and SUPABASE_SECRET_KEY.")
+    h={"Authorization":f"Bearer {SUPABASE_SERVICE_ROLE_KEY}","apikey":SUPABASE_SERVICE_ROLE_KEY}
+    if content_type: h["Content-Type"]=content_type
+    return h
+
+def _storage_object_url(path):
+    from urllib.parse import quote
+    return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{quote(SUPABASE_STORAGE_BUCKET,safe='')}/{quote(path,safe='/')}"
+
+def storage_upload(path,data,content_type="image/png"):
+    try:
+        r=requests.post(_storage_object_url(path),headers={**_storage_headers(content_type),"x-upsert":"true"},data=data,timeout=20); r.raise_for_status()
+    except requests.RequestException:
+        app.logger.exception("Supabase Storage upload failed"); raise RuntimeError("Could not store the uploaded file.")
+
+def storage_delete(path):
+    try:
+        from urllib.parse import quote
+        url=f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/remove/{quote(SUPABASE_STORAGE_BUCKET,safe='')}"
+        r=requests.post(url,headers=_storage_headers("application/json"),json={"prefixes":[path]},timeout=20); r.raise_for_status()
+    except requests.RequestException:
+        app.logger.exception("Supabase Storage delete failed"); raise RuntimeError("Could not remove the stored file.")
+
+def storage_response(path,mimetype="image/png"):
+    try:
+        from urllib.parse import quote
+        url=f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/authenticated/{quote(SUPABASE_STORAGE_BUCKET,safe='')}/{quote(path,safe='/')}"
+        r=requests.get(url,headers=_storage_headers(),timeout=20)
+        if r.status_code==404: abort(404)
+        r.raise_for_status()
+    except requests.RequestException:
+        app.logger.exception("Supabase Storage download failed"); abort(503)
+    return Response(r.content,mimetype=mimetype,max_age=0)
+
+
+def _storage_static(filename):
+    if filename.startswith("uploads/logos/"):
+        stored=filename.rsplit("/",1)[-1]; uid=session.get("user_id")
+        if not uid: abort(403)
+        account=db.execute("SELECT logo FROM accounts WHERE uid = ?",uid)
+        if not account or account[0].get("logo") != stored: abort(403)
+        return storage_response(f"logos/{uid}.png","image/png")
+    if filename.startswith("uploads/products/"):
+        stored=filename.rsplit("/",1)[-1]; uid=session.get("user_id")
+        if not uid: abort(403)
+        product=db.execute("SELECT id,barcode,qr_code,picture FROM products WHERE uid = ? AND (barcode = ? OR qr_code = ? OR picture = ?)",uid,stored,stored,stored)
+        if not product: abort(404)
+        row=product[0]; fmap={"barcode":row.get("barcode"),"qrcode":row.get("qr_code"),"picture":row.get("picture")}; field=next((f for f,v in fmap.items() if v==stored),None)
+        if not field: abort(404)
+        return storage_response(f"products/{uid}/{row['id']}_{field}.png","image/png")
+    return _original_static_view(filename)
+app.view_functions["static"]=_storage_static
 
 # --- Configuration ---
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")  # never hardcode this
@@ -294,16 +373,7 @@ VALID_HOMEPAGE_VALUES = list(HOMEPAGE_OPTIONS.keys())
 HOMEPAGE_OPTIONS_REVERSE = {db_value: form_key for form_key, db_value in HOMEPAGE_OPTIONS.items()}
 
 
-# --- Logging setup (put this near the top, after `app = Flask(__name__)`) ---
-if not app.debug:
-    handler = RotatingFileHandler("tefteri.log", maxBytes=1_000_000, backupCount=3)
-    handler.setLevel(logging.WARNING)
-    handler.setFormatter(logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s: %(message)s"
-    ))
-    app.logger.addHandler(handler)
-    app.logger.setLevel(logging.WARNING)
-
+app.logger.setLevel(logging.INFO if app.debug else logging.WARNING)
 logging.getLogger("tefteri").setLevel(logging.INFO)
 
 
@@ -475,7 +545,7 @@ def confirm_required(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if session.get("confirm") == False:
+        if not session.get("confirm", False):
             return redirect("/manage")
         return f(*args, **kwargs)
 
@@ -493,226 +563,45 @@ def allowed_logo_file(filename):
 
 
 def save_company_logo(file_storage, uid):
-    """
-    Securely process and save a company logo.
-
-    Returns the stored filename, or None if the file is invalid/unsafe.
-    """
-
-    if not file_storage or not file_storage.filename:
-        return None
-
-    # 1. Extension check
-
-    if not allowed_logo_file(file_storage.filename):
-        return None
-
-
-    # 2. File size check
-
-    file_storage.seek(0, os.SEEK_END)
-    size = file_storage.tell()
+    if not file_storage or not file_storage.filename or not allowed_logo_file(file_storage.filename): return None
+    file_storage.seek(0,os.SEEK_END); size=file_storage.tell(); file_storage.seek(0)
+    if size>5*1024*1024: return None
+    try: scan=scan_image_with_cloudmersive(file_storage)
+    except requests.RequestException: app.logger.exception("Cloudmersive logo scan failed"); return None
     file_storage.seek(0)
-
-    MAX_LOGO_SIZE = 5 * 1024 * 1024  # 5 MB
-
-    if size > MAX_LOGO_SIZE:
-        return None
-
-    # 3. Cloudmersive malware scan
-
+    if not scan.get("CleanResult",False): return None
     try:
-
-        scan_result = scan_image_with_cloudmersive(
-            file_storage
-        )
-
-    except requests.RequestException as e:
-        app.logger.exception("Cloudmersive logo scan failed")
-        return None
-
-    # Reset stream after API call
-    file_storage.seek(0)
-
-    # 4. Reject unsafe file
-
-    if not scan_result.get("CleanResult", False):
-        app.logger.warning("Unsafe logo rejected for uid %s: %s",uid,scan_result)
-        return None
-
-    # 5. Verify image
-
+        im=Image.open(file_storage); im.verify(); file_storage.seek(0); im=Image.open(file_storage); im.load()
+        if im.width>5000 or im.height>5000: return None
+        im=im.convert("RGBA")
+    except (UnidentifiedImageError,OSError,Image.DecompressionBombError): return None
+    except Exception: app.logger.exception("Could not process company logo"); return None
     try:
-        image = Image.open(file_storage)
-        image.verify()
-
-    except (UnidentifiedImageError, OSError):
-        return None
-
-    # 6. Decode image
-
-    file_storage.seek(0)
-
-    try:
-        image = Image.open(file_storage)
-        image.load()
-
-    except (UnidentifiedImageError, OSError):
-        return None
-
-    # 7. Dimension check
-
-    MAX_WIDTH = 5000
-    MAX_HEIGHT = 5000
-
-    if image.width > MAX_WIDTH or image.height > MAX_HEIGHT:
-        return None
-
-    # 8. Convert to safe format
-
-    try:
-        image = image.convert("RGBA")
-
-    except Exception:
-        app.logger.exception("Could not convert company logo")
-        return None
-
-    # 9. Remove previous logos
-
-    for old_ext in ALLOWED_LOGO_EXTENSIONS:
-        old_path = os.path.join(app.config["LOGO_UPLOAD_FOLDER"],f"{uid}.{old_ext}")
-
-        if os.path.exists(old_path):
-            try:
-                os.remove(old_path)
-            except OSError:
-                app.logger.exception("Could not remove old logo")
-
-    # 10. Save NEW clean PNG
-
-    filename = f"{uid}.png"
-    output_path = os.path.join(app.config["LOGO_UPLOAD_FOLDER"],filename)
-
-    try:
-        image.save(output_path,format="PNG")
-
-    except Exception:
-        app.logger.exception("Could not save company logo")
-        return None
-    return filename
-
+        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(f"logos/{uid}.png",out.getvalue())
+    except Exception: app.logger.exception("Could not save company logo"); return None
+    return f"{uid}.png"
 
 def allowed_product_image_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_PRODUCT_IMAGE_EXTENSIONS
-
+    return "." in filename and filename.rsplit(".",1)[1].lower() in ALLOWED_PRODUCT_IMAGE_EXTENSIONS
 
 def save_product_image(file_storage, product_id, field):
-    """
-    Securely process and save a barcode / QR code / picture image for a product.
-    Same pipeline as save_company_logo(): extension + size checks, malware scan,
-    Pillow verify + decode, dimension cap, re-encode to a clean PNG.
-
-    Returns the stored filename, or None if the file is invalid/unsafe.
-    """
-
-    if not file_storage or not file_storage.filename:
-        return None
-
-    # 1. Extension check
-
-    if not allowed_product_image_file(file_storage.filename):
-        return None
-
-    # 2. File size check
-
-    file_storage.seek(0, os.SEEK_END)
-    size = file_storage.tell()
+    if not file_storage or not file_storage.filename or field not in ALLOWED_PRODUCT_IMAGE_FIELDS or not allowed_product_image_file(file_storage.filename): return None
+    file_storage.seek(0,os.SEEK_END); size=file_storage.tell(); file_storage.seek(0)
+    if size>5*1024*1024: return None
+    try: scan=scan_image_with_cloudmersive(file_storage)
+    except requests.RequestException: app.logger.exception("Cloudmersive product image scan failed"); return None
     file_storage.seek(0)
-
-    MAX_PRODUCT_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB, matches MAX_CONTENT_LENGTH
-
-    if size > MAX_PRODUCT_IMAGE_SIZE:
-        return None
-
-    # 3. Cloudmersive malware scan
-
+    if not scan.get("CleanResult",False): return None
     try:
-        scan_result = scan_image_with_cloudmersive(file_storage)
-    except requests.RequestException:
-        app.logger.exception("Cloudmersive product image scan failed")
-        return None
-
-    # Reset stream after API call
-    file_storage.seek(0)
-
-    # 4. Reject unsafe file
-
-    if not scan_result.get("CleanResult", False):
-        app.logger.warning(
-            "Unsafe product image rejected for product %s (%s): %s",
-            product_id, field, scan_result
-        )
-        return None
-
-    # 5. Verify image
-
+        im=Image.open(file_storage); im.verify(); file_storage.seek(0); im=Image.open(file_storage); im.load()
+        if im.width>5000 or im.height>5000: return None
+        im=im.convert("RGBA")
+    except (UnidentifiedImageError,OSError,Image.DecompressionBombError): return None
+    except Exception: app.logger.exception("Could not process product image"); return None
     try:
-        image = Image.open(file_storage)
-        image.verify()
-    except (UnidentifiedImageError, OSError):
-        return None
-
-    # 6. Decode image
-
-    file_storage.seek(0)
-
-    try:
-        image = Image.open(file_storage)
-        image.load()
-    except (UnidentifiedImageError, OSError):
-        return None
-
-    # 7. Dimension check
-
-    MAX_WIDTH = 5000
-    MAX_HEIGHT = 5000
-
-    if image.width > MAX_WIDTH or image.height > MAX_HEIGHT:
-        return None
-
-    # 8. Convert to safe format
-
-    try:
-        image = image.convert("RGBA")
-    except Exception:
-        app.logger.exception("Could not convert product image")
-        return None
-
-    # 9. Remove previous image for this product/field
-
-    for old_ext in ALLOWED_PRODUCT_IMAGE_EXTENSIONS:
-        old_path = os.path.join(
-            app.config["PRODUCT_MEDIA_UPLOAD_FOLDER"], f"{product_id}_{field}.{old_ext}"
-        )
-        if os.path.exists(old_path):
-            try:
-                os.remove(old_path)
-            except OSError:
-                app.logger.exception("Could not remove old product image")
-
-    # 10. Save NEW clean PNG
-
-    filename = f"{product_id}_{field}.png"
-    output_path = os.path.join(app.config["PRODUCT_MEDIA_UPLOAD_FOLDER"], filename)
-
-    try:
-        image.save(output_path, format="PNG")
-    except Exception:
-        app.logger.exception("Could not save product image")
-        return None
-
-    return filename
-
+        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(f"products/{session['user_id']}/{product_id}_{field}.png",out.getvalue())
+    except Exception: app.logger.exception("Could not save product image"); return None
+    return f"{product_id}_{field}.png"
 
 def format_date(date_int):
     """Convert integer date (YYYYMMDD) to display format (YYYY-MM-DD)"""
@@ -737,14 +626,21 @@ def parse_date_to_int(date_str):
         return None
 
 
-from paddleocr import PaddleOCR
 _ocr_engine = None
 def get_ocr():
     global _ocr_engine
     if _ocr_engine is None:
-        _ocr_engine = PaddleOCR(use_angle_cls=True, lang='en')
+        try:
+            from paddleocr import PaddleOCR
+            ocr_lang = os.environ.get("OCR_LANG", "en")
+            try:
+                _ocr_engine=PaddleOCR(lang=ocr_lang,use_doc_orientation_classify=False,use_doc_unwarping=False,use_textline_orientation=False)
+            except TypeError:
+                # Compatibility with older PaddleOCR releases already used by the app.
+                _ocr_engine=PaddleOCR(use_angle_cls=True,lang=ocr_lang)
+        except Exception:
+            app.logger.exception("PaddleOCR initialization failed"); raise RuntimeError("Invoice OCR is temporarily unavailable.")
     return _ocr_engine
-
 
 def extract_invoice_data_with_groq(ocr_text: str, timeout: int = 30) -> dict:
     """
@@ -786,19 +682,22 @@ def extract_invoice_data_with_groq(ocr_text: str, timeout: int = 30) -> dict:
         resp = requests.post(GROQ_URL, headers=headers, json=payload, timeout=timeout)
         resp.raise_for_status()
     except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"Groq API request failed: {e}")
+        app.logger.exception("Groq API request failed")
+        raise RuntimeError("Invoice extraction service is temporarily unavailable.")
 
     data = resp.json()
 
     try:
         raw_text = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as e:
-        raise RuntimeError(f"Unexpected Groq response shape: {e} | raw={data}")
+        app.logger.error("Unexpected Groq response shape")
+        raise RuntimeError("Invoice extraction service returned an invalid response.")
 
     try:
         return json.loads(raw_text)
     except json.JSONDecodeError as e:
-        raise RuntimeError(f"Groq did not return valid JSON: {e} | raw_text={raw_text}")
+        app.logger.error("Groq returned invalid JSON")
+        raise RuntimeError("Invoice extraction service returned invalid data.")
 
 
 if SimpleDocTemplate is not None:
@@ -1503,15 +1402,11 @@ def customer_is_own_vat(uid, cafm):
 
 
 def get_user_id():
-    # session["user_id"] is only set for authenticated users, and this
-    # route is already @login_required, so this is safe to rely on.
-    return str(session.get("user_id", "anonymous"))
-
-limiter = Limiter(
-    key_func=get_user_id,
-    app=app,
-    storage_uri="memory://",  # switch to redis://... if you run >1 worker process
-)
+    return str(session.get("user_id") or request.remote_addr or "anonymous")
+RATELIMIT_STORAGE_URI=os.environ.get("RATELIMIT_STORAGE_URI") or os.environ.get("REDIS_URL") or "memory://"
+if RATELIMIT_STORAGE_URI=="memory://" and not app.debug:
+    app.logger.warning("RATELIMIT_STORAGE_URI is not configured; configure Redis/Upstash for shared serverless rate limits.")
+limiter=Limiter(key_func=get_user_id,app=app,storage_uri=RATELIMIT_STORAGE_URI)
 
 
 """Filters"""
@@ -2464,124 +2359,36 @@ def update_invoice():
 @app.route("/new_invoice", methods=["POST"])
 @login_required
 def new_invoice():
-    uid = session["user_id"]
-
-    customer_id = request.form.get('customer_id')
-    document_type = request.form.get('document_type')
-    products_raw = request.form.get('products')
-    products = json.loads(products_raw) if products_raw else None
-    invoice_date = request.form.get('invoice_date')
-    invoice_number = request.form.get('invoice_number')
-    transfer_info_raw = request.form.get('transfer_info')
-    salesperson = request.form.get('salesperson')
-
-    if not customer_id or not document_type or not products or not invoice_date:
-        flash("Please fill in all required fields.")
-        return redirect("/invoices")
-
-    cafm_result = db.execute("SELECT afm FROM sucu WHERE id = ? AND uid = ?", customer_id, uid)
-    if not cafm_result:
-        flash("Customer not found.")
-        return redirect("/invoices")
-    cafm = cafm_result[0]['afm']
-
-    myafm_result = db.execute("SELECT afm FROM accounts WHERE uid = ?", uid)
-    if not myafm_result:
-        flash("Account VAT number not found.")
-        return redirect("/invoices")
-    myafm = myafm_result[0]['afm']
-
-    receive = bool(customer_is_own_vat(uid, cafm))
-
-    oid = generate_random_number(16)
-
-    db.execute("""
-        INSERT INTO dorder (uid, cafm, order_type, rdate, tcompany, pstatus, edate, receive, oid, status, salesperson)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, uid, cafm, 'invoice', invoice_date, None, 'Pending Payment', invoice_date, receive, oid, 'pending', salesperson)
-
-    # Fill morder, one row per product line
+    uid=session["user_id"]
+    customer_id=request.form.get("customer_id"); document_type=request.form.get("document_type"); products_raw=request.form.get("products")
+    try: products=json.loads(products_raw) if products_raw else None
+    except (TypeError,ValueError): flash("Invalid product data."); return redirect("/invoices")
+    invoice_date=request.form.get("invoice_date"); invoice_number=request.form.get("invoice_number"); transfer_info_raw=request.form.get("transfer_info"); salesperson=request.form.get("salesperson")
+    if not customer_id or not document_type or not products or not invoice_date: flash("Please fill in all required fields."); return redirect("/invoices")
+    r=db.execute("SELECT afm FROM sucu WHERE id = ? AND uid = ?",customer_id,uid)
+    if not r: flash("Customer not found."); return redirect("/invoices")
+    cafm=r[0]["afm"]; r=db.execute("SELECT afm FROM accounts WHERE uid = ?",uid)
+    if not r: flash("Account VAT number not found."); return redirect("/invoices")
+    myafm=r[0]["afm"]; receive=bool(customer_is_own_vat(uid,cafm)); validated=[]
     for product in products:
-        if not product.get('product_id') or not product.get('quantity') or not product.get('price'):
-            flash("Please fill in all product fields.")
-            return redirect("/invoices")
-
-        pid_result = db.execute("SELECT pid FROM products WHERE name = ? AND uid = ?", product['name'], uid)
-        if not pid_result:
-            flash(f"Product '{product['name']}' not found.")
-            return redirect("/invoices")
-        pid = pid_result[0]['pid']
-
-        db.execute("""
-            INSERT INTO morder (uid, pid, quantity, price, lot, total, oid)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, uid, pid, product['quantity'], product['price'], product['lot_number'], product['subtotal'], oid)
-
-    # Finally, insert the invoice record itself
-    if document_type == "sales_invoice":
-        document_type = "Sales Invoice"
-    elif document_type == "sales_invoive_ics":
-        document_type = "Sales Invoice &amp; Intra Community Supply"
-    else:
-        document_type = "Service Invoice"
-
-    db.execute("""
-        INSERT INTO invoices (oid, afms, myafm, uid, doctype, invoice_number)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, oid, cafm, myafm, uid, document_type, invoice_number)
-
-    # Transfer info is optional. The popup writes a JSON blob (built client-side)
-    # into the hidden "transfer_info" field with this shape:
-    # {
-    #   "loading_location": {"address": ..., "city": ..., "postal_code": ...},
-    #   "place_of_destination": {"address": ..., "city": ..., "postal_code": ..., "country": ...},
-    #   "mode_of_transport": {"transport_company": ..., "transport_number": ..., "start_date": ..., "start_time": ...}
-    # }
-    # Only insert a row into transfers if the user actually filled something in.
-    if transfer_info_raw:
-        try:
-            transfer_info = json.loads(transfer_info_raw)
-        except (TypeError, ValueError):
-            transfer_info = {}
-
-        loading = transfer_info.get('loading_location') or {}
-        destination = transfer_info.get('place_of_destination') or {}
-        transport = transfer_info.get('mode_of_transport') or {}
-
-        laddress = loading.get('address') or None
-        lcity = loading.get('city') or None
-        lpostalcode = loading.get('postal_code') or None
-
-        daddress = destination.get('address') or None
-        dcity = destination.get('city') or None
-        dpostalcode = destination.get('postal_code') or None
-        dcountry = destination.get('country') or None
-
-        tcompany = transport.get('transport_company') or None
-        tnumber = transport.get('transport_number') or None
-        sdate = transport.get('start_date') or None
-        stime = transport.get('start_time') or None
-
-        has_any_value = any([
-            laddress, lcity, lpostalcode,
-            daddress, dcity, dpostalcode, dcountry,
-            tcompany, tnumber, sdate, stime
-        ])
-
-        if has_any_value:
-            db.execute("""
-                INSERT INTO transfers (
-                    oid, uid,
-                    laddress, lcity, lpostalcode,
-                    daddress, dcity, dpostalcode, dcountry,
-                    tcompany, tnumber, sdate, stime
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, oid, uid,
-                 laddress, lcity, lpostalcode,
-                 daddress, dcity, dpostalcode, dcountry,
-                 tcompany, tnumber, sdate, stime)
-
+        if not isinstance(product,dict) or not product.get("product_id") or not product.get("quantity") or not product.get("price"):
+            flash("Please fill in all product fields."); return redirect("/invoices")
+        pr=db.execute("SELECT pid FROM products WHERE id = ? AND uid = ?",product["product_id"],uid)
+        if not pr: flash("Product not found."); return redirect("/invoices")
+        validated.append((pr[0]["pid"],product))
+    oid=generate_random_number(16)
+    with db.transaction():
+        db.execute("INSERT INTO dorder (uid,cafm,order_type,rdate,tcompany,pstatus,edate,receive,oid,status,salesperson) VALUES (?,?,?,?,?,?,?,?,?,?,?)",uid,cafm,"invoice",invoice_date,None,"Pending Payment",invoice_date,receive,oid,"pending",salesperson)
+        for pid,product in validated:
+            db.execute("INSERT INTO morder (uid,pid,quantity,price,lot,total,oid) VALUES (?,?,?,?,?,?,?)",uid,pid,product["quantity"],product["price"],product.get("lot_number"),product.get("subtotal"),oid)
+        dtype={"sales_invoice":"Sales Invoice","sales_invoive_ics":"Sales Invoice &amp; Intra Community Supply"}.get(document_type,"Service Invoice")
+        db.execute("INSERT INTO invoices (oid,afms,myafm,uid,doctype,invoice_number) VALUES (?,?,?,?,?,?)",oid,cafm,myafm,uid,dtype,invoice_number)
+        if transfer_info_raw:
+            try: ti=json.loads(transfer_info_raw)
+            except (TypeError,ValueError): ti={}
+            loading=ti.get("loading_location") or {}; destination=ti.get("place_of_destination") or {}; transport=ti.get("mode_of_transport") or {}
+            vals=[loading.get("address") or None,loading.get("city") or None,loading.get("postal_code") or None,destination.get("address") or None,destination.get("city") or None,destination.get("postal_code") or None,destination.get("country") or None,transport.get("transport_company") or None,transport.get("transport_number") or None,transport.get("start_date") or None,transport.get("start_time") or None]
+            if any(vals): db.execute("INSERT INTO transfers (oid,uid,laddress,lcity,lpostalcode,daddress,dcity,dpostalcode,dcountry,tcompany,tnumber,sdate,stime) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",oid,uid,*vals)
     return redirect("/invoices")
 
 @app.route("/delete_invoice", methods=["POST"])
@@ -2640,14 +2447,11 @@ def login():
 
         rows = db.execute("SELECT * FROM accounts WHERE email = ?  ", email)
 
-        if not rows:
-            flash("You must have entered some detail wrong!")
-            return render_template("signin.html")
-
         if len(rows) != 1 or not check_password_hash(rows[0].get("hash"), password):
             flash("Invalid email or password.")
             return render_template("signin.html")
 
+        session.clear()
         session["user_id"] = rows[0].get("uid")
 
         return redirect("/")
@@ -2870,6 +2674,7 @@ def signup():
         )
 
         # Log the new account in immediately so /onboarding knows who's asking
+        session.clear()
         session["user_id"] = uid
 
         return redirect(url_for("onboarding"))
@@ -3046,13 +2851,10 @@ def delete_product_image():
     if not filename:
         raise ValidationError("No image to remove.")
 
-    file_path = os.path.join(app.config["PRODUCT_MEDIA_UPLOAD_FOLDER"], filename)
-    if os.path.exists(file_path):
-        try:
-            os.remove(file_path)
-        except OSError:
-            app.logger.exception("Could not remove product image for product %s (%s)", product_id, field)
-            raise AppError("Could not remove the image. Please try again.", status_code=500)
+    try:
+        storage_delete(f"products/{uid}/{product_id}_{field}.png")
+    except RuntimeError:
+        raise AppError("Could not remove the image. Please try again.", status_code=500)
 
     if field == "barcode":
         db.execute("UPDATE products SET barcode = NULL WHERE id = ? AND uid = ?", product_id, uid)
@@ -3281,77 +3083,30 @@ def edit_sucu():
 @app.route("/new_order", methods=["GET", "POST"])
 @login_required
 def new_order():
-
-    account_rows = db.execute("SELECT * FROM accounts WHERE uid = ?", session["user_id"])
-    account = account_rows[0] if account_rows else None
-
-    if request.method == "POST":
-        uid = session["user_id"]
-        customer_id = request.form['customer_id']
-        order_type = request.form['order_type']
-        products_raw = request.form.get('products')
-        products = json.loads(products_raw) if products_raw else None
-        order_date = request.form['order_date']
-        tcompany = request.form['transfer_company']
-        pstatus = request.form['payment_status']
-        due_date = request.form['due_date']
-        salesperson = request.form.get('salesperson')
-        comments = request.form.get('comments')
-        
-        if not customer_id or not order_type or not products or not order_date:
-            flash("Please fill in all required fields.")
-            return redirect("/new_order")
-
-
-        oid = generate_random_number(16)
-
-
-        cafm_result = db.execute("SELECT afm FROM sucu WHERE id = ? AND uid = ?", customer_id, uid)
-        if not cafm_result:
-            flash("Customer not found.")
-            return redirect("/new_order")
-        cafm = cafm_result[0]['afm']
-
-        receive = bool(customer_is_own_vat(uid, cafm))
-
-        db.execute("""
-            INSERT INTO dorder (uid, cafm, order_type, rdate, tcompany, pstatus, edate, receive, oid, status, salesperson, comments)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-            uid, cafm, order_type, order_date, tcompany, pstatus, due_date, receive, oid, 'pending', salesperson, comments
-        )
-
-
+    rows=db.execute("SELECT * FROM accounts WHERE uid = ?",session["user_id"]); account=rows[0] if rows else None
+    if request.method=="POST":
+        uid=session["user_id"]; customer_id=request.form['customer_id']; order_type=request.form['order_type']; products_raw=request.form.get('products')
+        try: products=json.loads(products_raw) if products_raw else None
+        except (TypeError,ValueError): flash("Invalid product data."); return redirect("/new_order")
+        order_date=request.form['order_date']; tcompany=request.form['transfer_company']; pstatus=request.form['payment_status']; due_date=request.form['due_date']; salesperson=request.form.get('salesperson'); comments=request.form.get('comments')
+        if not customer_id or not order_type or not products or not order_date: flash("Please fill in all required fields."); return redirect("/new_order")
+        r=db.execute("SELECT afm FROM sucu WHERE id = ? AND uid = ?",customer_id,uid)
+        if not r: flash("Customer not found."); return redirect("/new_order")
+        cafm=r[0]["afm"]; receive=bool(customer_is_own_vat(uid,cafm)); validated=[]
         for product in products:
-            if not product.get('product_id') or not product.get('quantity') or not product.get('price'):
-                flash("Please fill in all product fields.")
-                return redirect("/new_order")
-
-
-            pid = product['product_id']
-            pid_result = db.execute("SELECT pid FROM products WHERE name = ? AND uid = ?", product['name'], uid)
-            if not pid_result:
-                flash(f"Product '{product['name']}' not found.")
-                return redirect("/new_order")
-            pid = pid_result[0]['pid']
-        
-            tax = db.execute("SELECT tax FROM products WHERE pid = ? AND uid = ?", pid, uid)
-            if tax:
-                tax_value = tax[0]['tax']
-            else:
-                tax_value = 0 
-            db.execute("INSERT INTO morder (uid, pid, quantity, price, lot, total, oid, tax) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                uid, pid, product['quantity'], product['price'], product['lot_number'], product['subtotal'], oid, tax_value
-            )
-
-
-
+            if not isinstance(product,dict) or not product.get("product_id") or not product.get("quantity") or not product.get("price"):
+                flash("Please fill in all product fields."); return redirect("/new_order")
+            pr=db.execute("SELECT pid,tax FROM products WHERE id = ? AND uid = ?",product["product_id"],uid)
+            if not pr: flash("Product not found."); return redirect("/new_order")
+            validated.append((pr[0]["pid"],pr[0]["tax"] or 0,product))
+        oid=generate_random_number(16)
+        with db.transaction():
+            db.execute("INSERT INTO dorder (uid,cafm,order_type,rdate,tcompany,pstatus,edate,receive,oid,status,salesperson,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",uid,cafm,order_type,order_date,tcompany,pstatus,due_date,receive,oid,"pending",salesperson,comments)
+            for pid,tax,product in validated:
+                db.execute("INSERT INTO morder (uid,pid,quantity,price,lot,total,oid,tax) VALUES (?,?,?,?,?,?,?,?)",uid,pid,product["quantity"],product["price"],product.get("lot_number"),product.get("subtotal"),oid,tax)
         return redirect("/")
-    
-    customers = db.execute("SELECT id, name, afm FROM sucu WHERE uid = ? AND supplier = FALSE", session["user_id"])
-    PRODUCTS = db.execute("SELECT id, name, price, pid, sku FROM products WHERE uid = ?", session["user_id"])
-    return render_template("new_order.html", customers=customers, products=PRODUCTS, account=account)
-
+    customers=db.execute("SELECT id,name,afm FROM sucu WHERE uid = ? AND supplier = FALSE",session["user_id"]); PRODUCTS=db.execute("SELECT id,name,price,pid,sku FROM products WHERE uid = ?",session["user_id"])
+    return render_template("new_order.html",customers=customers,products=PRODUCTS,account=account)
 
 @app.route("/update_order", methods=["POST"])
 @login_required
@@ -3405,8 +3160,6 @@ def scan_invoice():
     invoice data via Groq, and return both raw text and structured data.
     Also checks whether the scanned customer/vendor already exist in sucu.
     """
-    POPPLER_PATH = r"C:\proppler\Library\bin"
-
     # 1. File present?
     if 'file' not in request.files:
         return jsonify({"success": False, "error": "No file provided"}), 400
@@ -3417,18 +3170,9 @@ def scan_invoice():
     # 2. Validate type
     if not file.filename.lower().endswith('.pdf'):
         return jsonify({"success": False, "error": "Only PDF files are allowed"}), 400
-    try:
-        file_data = file.read(1024)
-        file.seek(0)
-        mime_type = magic.from_buffer(file_data, mime=True)
-        if mime_type != 'application/pdf':
-            return jsonify({"success": False, "error": "File is not a valid PDF (MIME mismatch)"}), 400
-    except Exception:
-        file.seek(0)
-        header = file.read(4)
-        file.seek(0)
-        if header != b'%PDF':
-            return jsonify({"success": False, "error": "File does not appear to be a PDF"}), 400
+    file_data=file.read(8); file.seek(0)
+    if not file_data.startswith(b"%PDF"):
+        return jsonify({"success":False,"error":"File does not appear to be a PDF"}),400
 
     # 3. Size check
     file.seek(0, os.SEEK_END)
@@ -3463,7 +3207,7 @@ def scan_invoice():
 
     except requests.RequestException as e:
 
-        print("Cloudmersive API error:", e)
+        app.logger.exception("Cloudmersive invoice scan failed")
 
         return jsonify({
             "success": False,
@@ -3478,9 +3222,6 @@ def scan_invoice():
     # 5. Reject unsafe files
     if not scan_result.get("CleanResult", False):
 
-        print("=== SECURITY SCAN FAILED ===")
-        print(json.dumps(scan_result, indent=2))
-        print("============================")
 
         return jsonify({
             "success": False,
@@ -3498,23 +3239,23 @@ def scan_invoice():
         tmp_path = tmp.name
 
     try:
-        # 5. PDF → images
-        images = pdf2image.convert_from_path(tmp_path, dpi=200, poppler_path=POPPLER_PATH)
-        if not images:
-            return jsonify({"success": False, "error": "PDF contains no pages"}), 400
 
-        # 6. OCR
-        ocr_engine = get_ocr()
-        all_text = []
-        for idx, img in enumerate(images):
-            img_array = np.array(img)
-            result = ocr_engine.predict(img_array)
-            page_text = []
-            for res in result:
-                rec_texts = res.json.get("res", {}).get("rec_texts", [])
-                page_text.extend(rec_texts)
-            all_text.append(f"--- Page {idx+1} ---\n" + "\n".join(page_text))
-        extracted_text = "\n\n".join(all_text)
+        # PaddleOCR accepts a local PDF path directly; no Poppler dependency is needed.
+        ocr_engine=get_ocr(); all_text=[]
+        try:
+            result=ocr_engine.predict(tmp_path)
+            for idx,res in enumerate(result):
+                payload=getattr(res,"json",{}) or {}
+                if isinstance(payload,str):
+                    try: payload=json.loads(payload)
+                    except json.JSONDecodeError: payload={}
+                inner=payload.get("res",{}) or {}; rec_texts=inner.get("rec_texts",[]) or []; page_index=inner.get("page_index")
+                page_number=(page_index+1) if isinstance(page_index,int) else idx+1
+                all_text.append(f"--- Page {page_number} ---\n"+"\n".join(rec_texts))
+        except Exception:
+            app.logger.exception("PaddleOCR PDF inference failed")
+            return jsonify({"success":False,"error":"Invoice OCR is temporarily unavailable."}),503
+        extracted_text="\n\n".join(all_text)
 
         # 7. Structured extraction
         uid = session["user_id"]                     # <-- moved up
@@ -3734,39 +3475,26 @@ def scan_invoice():
                         })
 
                                 # Optional: debug output to server console
-                print("=== SCAN INVOICE DEBUG ===")
-                print(f"Vendor VAT: {vendor_vat if 'vendor_vat' in locals() else 'not set'}")
-                print(f"Customer VAT: {customer_vat if 'customer_vat' in locals() else 'not set'}")
-                print(f"Missing contacts: {missing_contacts}")
-                print("===========================")
 
                 # --- NEW: Print the full extracted invoice data ---
-                print("=== EXTRACTED INVOICE DATA ===")
-                print(json.dumps(invoice_data, indent=2, default=str))
-                print("================================")
 
                 structured_success = True
                 structured_error = None
 
                 # Optional: debug output to server console
-                print("=== SCAN INVOICE DEBUG ===")
-                print(f"Vendor VAT: {vendor_vat if 'vendor_vat' in locals() else 'not set'}")
-                print(f"Customer VAT: {customer_vat if 'customer_vat' in locals() else 'not set'}")
-                print(f"Missing contacts: {missing_contacts}")
-                print("===========================")
 
             structured_success = True
             structured_error = None
         except RuntimeError as e:
             invoice_data = None
             structured_success = False
-            structured_error = str(e)
+            structured_error = "Invoice extraction failed. Please try again."
 
         # 8. Return
         return jsonify({
             "success": True,
             "text": extracted_text,
-            "pages": len(images),
+            "pages": num_pages,
             "structured_extraction_success": structured_success,
             "structured_extraction_error": structured_error,
             "invoice_data": invoice_data,
@@ -3784,7 +3512,6 @@ def scan_invoice():
     finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
-
 
 
 
@@ -5017,7 +4744,7 @@ def generate_report(report_type):
         columns, rows = handler(uid, f)
     except Exception as e:
         app.logger.exception(f"Report generation failed: report={report_type}")
-        return jsonify({"success": False, "message": str(e) or type(e).__name__}), 500
+        return jsonify({"success": False, "message": "Report generation failed. Please try again."}), 500
 
     fmt = f["format"]
     title = REPORT_TITLES.get(report_type, report_type)
@@ -5032,7 +4759,7 @@ def generate_report(report_type):
                 return build_pdf(title, columns, rows, f=f, currency_code=currency_code)
         except Exception as e:
             app.logger.exception(f"Report export failed: report={report_type} format={fmt}")
-            return jsonify({"success": False, "message": str(e) or type(e).__name__}), 500
+            return jsonify({"success": False, "message": "Report generation failed. Please try again."}), 500
 
     return jsonify({
         "success": True,
@@ -5318,17 +5045,9 @@ def delete_transfer_info():
 @app.route("/uploads/logos/<filename>")
 @login_required
 def uploaded_logo(filename):
-    # Unchanged -- abort(403) already routes straight into the central
-    # @app.errorhandler(403) handler we set up at the very start, so this
-    # already gets the styled error.html page (or JSON, if requested via
-    # @json_route context -- though this route is typically hit as a
-    # plain <img src> request, so the HTML error page is what'll actually
-    # show if it ever fires, e.g. broken image icon aside).
-    uid = session["user_id"]
-    account = db.execute("SELECT logo FROM accounts WHERE uid = ?", uid)
-    if not account or account[0]["logo"] != filename:
-        abort(403)
-    return send_from_directory(app.config["LOGO_UPLOAD_FOLDER"], filename)
+    uid=session["user_id"]; account=db.execute("SELECT logo FROM accounts WHERE uid = ?",uid)
+    if not account or account[0]["logo"] != filename: abort(403)
+    return storage_response(f"logos/{uid}.png","image/png")
 
 @app.route("/help")
 def help_center():

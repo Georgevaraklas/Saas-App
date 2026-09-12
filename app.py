@@ -2247,7 +2247,7 @@ def invoices():
  
     # Seller ("YOUR COMPANY") details for the invoice header, from the logged-in user's account.
     account_rows = db.execute("""
-        SELECT name, afm, phone, email, street, addressnumber, country, city, logo, currency
+        SELECT name, afm, phone, email, street, country, city, logo, currency
         FROM accounts WHERE uid = ?
     """, uid)
     account = account_rows[0] if account_rows else None
@@ -2262,7 +2262,6 @@ def invoices():
         "phone": account["phone"] if account else None,
         "email": account["email"] if account else None,
         "street": account["street"] if account else None,
-        "addressnumber": account["addressnumber"] if account else None,
         "city": account["city"] if account else None,
         "country": account["country"] if account else None,
         "logo_url": logo_url,

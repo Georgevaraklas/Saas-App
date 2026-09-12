@@ -556,6 +556,30 @@
         padding: 16px 14px 20px;
       }
     }
+
+    /* ---------------- Modal entrance animation ---------------- */
+    @keyframes overlayFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes modalPopIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    /* :not(.side-by-side) keeps this from touching the "Add More" flow
+       above, which already has its own opacity/transform transition. */
+    .modal-overlay.open:not(.side-by-side) {
+      animation: overlayFadeIn 0.18s ease-out;
+    }
+    .modal-overlay.open:not(.side-by-side) .modal-box {
+      animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
   </style>
 {% endblock %}
 
@@ -1323,10 +1347,6 @@
         removeBtn.disabled = false;
       });
   }
-
-  document.getElementById('mmback-btn').addEventListener('click', () => {
-    window.location.href = '/';
-  });
 
   document.getElementById('neworderBtn').addEventListener('click', () => {
     window.location.href = '/new_order';

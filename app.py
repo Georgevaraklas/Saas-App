@@ -2615,7 +2615,7 @@ def suppliers_customers():
     rows = db.execute(
         """SELECT id, name, afm, adress AS address, phone, activity, supplier,
                   fullname AS full_name, sphone AS mobile, city,
-                  pcode AS postal_code, country, desc AS description, email
+                  pcode AS postal_code, country, description AS description, email
            FROM sucu WHERE uid = ?""",
         uid
     )
@@ -3207,7 +3207,7 @@ def add_sucu():
         db.execute(
             """INSERT INTO sucu
                (name, afm, adress, phone, activity, supplier, uid,
-                country, fullname, sphone, city, pcode, desc, email)
+                country, fullname, sphone, city, pcode, description, email)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             company_name, vat_number, address, phone, activity, supplier_flag, uid,
             country, full_name, mobile, city, postal_code, description, email
@@ -3269,7 +3269,7 @@ def edit_sucu():
     db.execute(
         """UPDATE sucu SET
             name = ?, fullname = ?, afm = ?, adress = ?, phone = ?, sphone = ?,
-            city = ?, pcode = ?, country = ?, desc = ?, email = ?, activity = ?, supplier = ?
+            city = ?, pcode = ?, country = ?, description = ?, email = ?, activity = ?, supplier = ?
         WHERE id = ? AND uid = ?""",
         company_name, full_name, vat_number, address, phone, mobile,
         city, postal_code, country, description, email, activity, supplier_flag,
@@ -3929,7 +3929,7 @@ def save_scanned_contact():
     db.execute(
         """INSERT INTO sucu
            (name, afm, adress, phone, activity, supplier, uid,
-            country, fullname, sphone, city, pcode, desc, email)
+            country, fullname, sphone, city, pcode, description, email)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         name, afm or None, address, phone, "", supplier_flag, uid,
         country, name, phone, city, postal_code, "", email
@@ -5093,7 +5093,7 @@ def alerts():
 
     # Pre-fills the "Notify On" field with the logged-in user's email.
     # Adjust the table/column name if your users table differs.
-    user_row = db.execute("SELECT email FROM accounts WHERE id = ?", uid)
+    user_row = db.execute("SELECT email FROM accounts WHERE uid = ?", uid)
     user_email = user_row[0]["email"] if user_row else ""
 
     return render_template(

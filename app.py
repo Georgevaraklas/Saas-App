@@ -248,7 +248,7 @@ def _storage_static(filename):
         row=product[0]; fmap={"barcode":row.get("barcode"),"qrcode":row.get("qr_code"),"picture":row.get("picture")}; field=next((f for f,v in fmap.items() if v==stored),None)
         if not field: abort(404)
         return storage_response(f"products/{uid}/{row['id']}_{field}.png","image/png")
-    return _original_static_view(filename)
+    return app.send_static_file(filename)
 app.view_functions["static"]=_storage_static
 
 # --- Configuration ---

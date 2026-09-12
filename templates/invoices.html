@@ -63,42 +63,112 @@
       box-sizing: border-box;
     }
 
+    /* =======================================================
+       Page shell — mirrors the Stock page's redesigned
+       header/toolbar/card pattern, built on layout.html's
+       existing design system. The invoices table itself keeps
+       its original markup and .inv-table-wrapper styling below.
+       ======================================================= */
+    .inv-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .inv-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .inv-header .greeting-eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #9A9AA0;
+      margin: 0 0 4px;
+    }
+
+    .inv-header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: #1c1c1c;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+
+    /* Toolbar card housing add/scan buttons + sort + search */
+    .inv-toolbar-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
     .inv-topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      margin-bottom: 10px;
     }
 
-    .inv-topbar-actions {
+    .inv-topbar .left-buttons {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .inv-topbar .right-controls {
       display: flex;
       align-items: center;
-      gap: 16px;
-      margin-left: auto;
+      gap: 12px;
     }
 
-    .btn-add-new {
-      padding: 12px 26px;
-      font-size: 15px;
-      font-weight: 600;
-      border-radius: 8px;
-    }
-
-    /* --- New "Scan With AI" button (purple) --- */
-    .btn-ai-scan {
-      padding: 12px 26px;
-      font-size: 15px;
-      font-weight: 600;
-      border-radius: 8px;
-      background: #6f42c1;
-      color: #fff;
+    .inv-topbar .left-buttons .btn-primary-dark,
+    .inv-topbar .left-buttons .btn-ai-scan {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       border: none;
       cursor: pointer;
-      transition: background 0.15s ease;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 11px 18px;
+      border-radius: 12px;
+      transition: transform .12s ease, box-shadow .12s ease, background-color .12s ease;
+    }
+    .inv-topbar .left-buttons .btn-primary-dark svg,
+    .inv-topbar .left-buttons .btn-ai-scan svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+    }
+    .inv-topbar .left-buttons .btn-primary-dark {
+      background: #1c1c1c;
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(0,0,0,0.12);
+    }
+    .inv-topbar .left-buttons .btn-primary-dark:hover {
+      background: #303030;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(0,0,0,0.16);
+    }
+
+    /* "Scan With AI" keeps its own accent color so the AI-powered
+       action stays visually distinct from the plain "Add New" flow. */
+    .btn-ai-scan {
+      background: #6f42c1;
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 6px 16px rgba(111,66,193,0.22);
     }
     .btn-ai-scan:hover {
       background: #5a32a3;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 10px 22px rgba(111,66,193,0.28);
     }
 
     .inv-sort-wrap {
@@ -114,7 +184,7 @@
       white-space: nowrap;
     }
     .inv-sort-wrap select {
-      padding: 9px 12px;
+      padding: 8px 12px;
       border: 1px solid #ddd;
       border-radius: 20px;
       font-size: 14px;
@@ -127,22 +197,26 @@
       border-color: #111;
     }
 
+    .inv-topbar .right-search {
+      display: flex;
+      align-items: center;
+    }
     .inv-search-wrap {
       position: relative;
-      flex: 0 1 320px;
     }
     .inv-search-wrap input[type="text"] {
-      width: 100%;
+      width: 200px;
       box-sizing: border-box;
-      padding: 10px 14px 10px 36px;
+      padding: 8px 14px 8px 36px;
       border: 1px solid #ddd;
       border-radius: 20px;
       font-size: 14px;
       outline: none;
-      transition: border-color 0.15s ease;
+      transition: border-color 0.15s ease, width 0.15s ease;
     }
     .inv-search-wrap input[type="text"]:focus {
       border-color: #111;
+      width: 240px;
     }
     .inv-search-wrap .inv-search-icon {
       position: absolute;
@@ -152,6 +226,64 @@
       font-size: 14px;
       color: #999;
       pointer-events: none;
+      display: inline-flex;
+    }
+
+    /* Table card wrapper (outer shell around the existing,
+       unmodified table styling in .inv-table-wrapper) */
+    .inv-table-card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 22px 22px 26px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.05);
+    }
+
+    .section-heading-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 2px;
+    }
+    .section-heading-row h2.wlcm {
+      font-size: 17px;
+      font-weight: 700;
+      color: #1c1c1c;
+      margin: 0;
+    }
+    .section-heading-row .section-sub {
+      font-size: 13px;
+      color: #9A9AA0;
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      .inv-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .inv-topbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .inv-topbar .left-buttons,
+      .inv-topbar .right-controls {
+        width: 100%;
+        justify-content: stretch;
+      }
+      .inv-topbar .left-buttons .btn-primary-dark,
+      .inv-topbar .left-buttons .btn-ai-scan {
+        flex: 1 1 auto;
+        justify-content: center;
+      }
+      .inv-search-wrap input[type="text"],
+      .inv-search-wrap input[type="text"]:focus {
+        width: 100%;
+      }
+      .inv-toolbar-card,
+      .inv-table-card {
+        padding: 16px 14px 20px;
+      }
     }
 
     /* Table, styled the same way as the Order History / Contacts table */
@@ -812,38 +944,58 @@
 
 <div class="page inv-page">
 
-  <br><br>
+  <div class="inv-wrap">
 
-  <div class="inv-topbar">
-    <h2>Invoices</h2>
-    <div class="inv-topbar-actions">
-      <!-- New "Scan With AI" button (purple) -->
-      <button class="btn-ai-scan" id="openAIScanBtn" type="button">Scan With AI</button>
-      <button class="btn-primary btn-add-new" id="openFormBtn" type="button">Add New</button>
-      <div class="inv-sort-wrap">
-        <label for="inv-sort-select">Sort By</label>
-        <select id="inv-sort-select">
-          <option value="issue_date_desc" selected>Issue Date (Newest First)</option>
-          <option value="issue_date_asc">Issue Date (Oldest First)</option>
-          <option value="date_desc">Date (Newest First)</option>
-          <option value="date_asc">Date (Oldest First)</option>
-          <option value="name_asc">Contact Name (A–Z)</option>
-          <option value="name_desc">Contact Name (Z–A)</option>
-          <option value="total_desc">Total (High to Low)</option>
-          <option value="total_asc">Total (Low to High)</option>
-        </select>
+  <div class="inv-header">
+    <div>
+      <p class="greeting-eyebrow">Billing</p>
+      <h1>Invoices</h1>
+    </div>
+  </div>
+
+  <div class="inv-toolbar-card">
+    <div class="inv-topbar">
+      <div class="left-buttons">
+        <button class="btn-primary-dark" id="openFormBtn" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4v12M4 10h12"/></svg>
+          Add New
+        </button>
+        <button class="btn-ai-scan" id="openAIScanBtn" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3l1.6 4.4L16 9l-4.4 1.6L10 15l-1.6-4.4L4 9l4.4-1.6z"/></svg>
+          Scan With AI
+        </button>
       </div>
-      <div class="inv-search-wrap">
-        <span class="inv-search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
+      <div class="right-controls">
+        <div class="inv-sort-wrap">
+          <label for="inv-sort-select">Sort By</label>
+          <select id="inv-sort-select">
+            <option value="issue_date_desc" selected>Issue Date (Newest First)</option>
+            <option value="issue_date_asc">Issue Date (Oldest First)</option>
+            <option value="date_desc">Date (Newest First)</option>
+            <option value="date_asc">Date (Oldest First)</option>
+            <option value="name_asc">Contact Name (A–Z)</option>
+            <option value="name_desc">Contact Name (Z–A)</option>
+            <option value="total_desc">Total (High to Low)</option>
+            <option value="total_asc">Total (Low to High)</option>
+          </select>
+        </div>
+        <div class="right-search">
+          <div class="inv-search-wrap">
+            <span class="inv-search-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-search" viewBox="0 0 16 16">
   <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0"/>
 </svg></span>
-        <input type="text" id="inv-search-input" placeholder="Search invoices...">
+            <input type="text" id="inv-search-input" placeholder="Search invoices...">
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
-  <br>
-
+  <div class="inv-table-card">
+    <div class="section-heading-row">
+      <h2 class="wlcm">All Invoices</h2>
+      <span class="section-sub">{{ invoices|length if invoices else 0 }} entries</span>
+    </div>
   <div class="inv-table-wrapper">
     <table>
       <thead>
@@ -925,6 +1077,9 @@
         {% endif %}
       </tbody>
     </table>
+  </div>
+  </div>
+
   </div>
 
   <script type="application/json" id="invoices-data">{{ invoices | default([]) | tojson }}</script>

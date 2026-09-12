@@ -323,6 +323,34 @@
       overflow-y: auto;
     }
 
+    /* --- New Recipe modal appearance/close animation --- */
+    #newRecipeModal.open .modal-box {
+      animation: newRecipeModalPop 0.22s ease;
+    }
+    #newRecipeModal.closing .modal-box {
+      animation: newRecipeModalPopOut 0.18s ease forwards;
+    }
+    @keyframes newRecipeModalPop {
+      from {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+    @keyframes newRecipeModalPopOut {
+      from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+      to {
+        opacity: 0;
+        transform: scale(0.95) translateY(8px);
+      }
+    }
+
     .recipe-name-row {
       margin-bottom: 6px;
     }
@@ -372,7 +400,7 @@
       border-radius: 6px;
       font-size: 13px;
       box-sizing: border-box;
-      background: #fff;
+      background: #fff !important;
       text-align: left;
       cursor: pointer;
       display: flex;
@@ -1170,6 +1198,19 @@
     recipeFormError.classList.remove('show');
   }
 
+  const newModalBox = newModal.querySelector('.modal-box');
+
+  function closeNewRecipeModal() {
+    if (!newModal.classList.contains('open') || newModal.classList.contains('closing')) return;
+    newModal.classList.add('closing');
+  }
+
+  newModalBox.addEventListener('animationend', (e) => {
+    if (e.target === newModalBox && newModal.classList.contains('closing')) {
+      newModal.classList.remove('open', 'closing');
+    }
+  });
+
   openNewBtn.addEventListener('click', () => {
     resetNewRecipeForm();
     newModal.classList.add('open');
@@ -1185,11 +1226,11 @@
   });
 
   cancelNewBtn.addEventListener('click', () => {
-    newModal.classList.remove('open');
+    closeNewRecipeModal();
   });
 
   newModal.addEventListener('click', (e) => {
-    if (e.target === newModal) newModal.classList.remove('open');
+    if (e.target === newModal) closeNewRecipeModal();
   });
 
   recipeForm.addEventListener('submit', (e) => {

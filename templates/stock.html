@@ -808,6 +808,30 @@
       background: #0b1215;
       color: white;
     }
+
+    /* --- Pop-up open animation (applies to all popup/modal overlays on
+       this page: New Stock Item, Sync Order / Use Recipe / Order
+       Traceability / Edit Order, Field editor, Edit Stock Items) --- */
+    @keyframes modalOverlayFadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes modalBoxPopIn {
+      from { opacity: 0; transform: translateY(10px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .popup-overlay.active,
+    .sync-overlay.active,
+    .field-overlay.active,
+    .edit-stock-items-overlay.active {
+      animation: modalOverlayFadeIn 0.18s ease;
+    }
+    .popup-overlay.active .popup-modal,
+    .sync-overlay.active .sync-modal,
+    .field-overlay.active .field-modal,
+    .edit-stock-items-overlay.active .edit-stock-items-modal {
+      animation: modalBoxPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
   </style>
 {% endblock %}
 

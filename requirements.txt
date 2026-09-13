@@ -12,3 +12,6 @@ paddleocr
 numpy
 openpyxl
 reportlab
+PyJWT
+cryptography
+requests

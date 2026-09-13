@@ -648,6 +648,8 @@
     });
   });
 
+  const wizardForm = document.getElementById('obWizard');
+
   nextBtn.addEventListener('click', (e) => {
     // Steps 1–3: validate that step and move forward instead of submitting.
     // Step 4 (Review): let the click through so the form really submits to Flask.
@@ -658,6 +660,14 @@
       showStep(currentStep);
       return;
     }
+    // Don't touch nextBtn.disabled here — disabling the submit button
+    // synchronously inside its own click handler can cancel the browser's
+    // default action (the form submission) before it fires, in some
+    // browsers. Do the "Saving…" state change on the form's submit event
+    // instead, which only runs once the browser has committed to submitting.
+  });
+
+  wizardForm.addEventListener('submit', () => {
     nextBtn.disabled = true;
     nextBtn.textContent = 'Saving…';
     // form submits normally here — Flask handles the redirect or re-renders with a flash on error

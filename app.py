@@ -230,7 +230,9 @@ def storage_response(path,mimetype="image/png"):
         r.raise_for_status()
     except requests.RequestException:
         app.logger.exception("Supabase Storage download failed"); abort(503)
-    return Response(r.content,mimetype=mimetype,max_age=0)
+    resp=Response(r.content,mimetype=mimetype)
+    resp.headers["Cache-Control"]="no-cache, max-age=0"
+    return resp
 
 
 def _storage_static(filename):

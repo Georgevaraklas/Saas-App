@@ -29,7 +29,7 @@ class OwnershipError(AppError):
 
 
 class AuthError(AppError):
-    """For routes that manually check `session["user_id"]` instead of
+    """For routes that manually check `g.user_id` instead of
     using @login_required (e.g. because they need a custom 401 JSON
     response rather than a redirect to /login)."""
     def __init__(self, message="Please log in to continue."):

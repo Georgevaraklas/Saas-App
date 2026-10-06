@@ -236,6 +236,7 @@
   <div class="popup-overlay" id="overlay">
     <div class="popup-modal">
       <form id="orderForm" action="/add_order" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <h2>New Order</h2>
         <label for="customerName">Customer Name</label>
         <select id="customerName" name="customer_name" required>

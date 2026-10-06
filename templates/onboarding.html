@@ -415,6 +415,7 @@
 
     <!-- ===== wizard ===== -->
     <form id="obWizard" method="POST" action="{{ url_for('onboarding') }}" enctype="multipart/form-data" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="ob-head">
         <p class="ob-eyebrow">Welcome</p>
         <h2 class="ob-title">Let's get you set up</h2>

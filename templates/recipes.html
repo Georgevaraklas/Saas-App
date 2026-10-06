@@ -768,10 +768,11 @@
     <div class="modal-box">
       <h3>New Recipe</h3>
       <form id="recipeForm" action="/add_recipe" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="recipe-name-row form-group">
           <label for="recipeName">Recipe name</label>
-          <input type="text" id="recipeName" name="name" placeholder="e.g. Orange Oil Blend" required>
+          <input type="text" id="recipeName" name="name" placeholder="Recipe Name" required>
         </div>
 
         <div class="section-label first">Outputs</div>
@@ -1005,6 +1006,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   // ---- Products available for ingredient / output selection ----
   const PRODUCTS = {{ products | tojson }};
 
@@ -1356,7 +1361,7 @@
     try {
       const response = await fetch('/edit_recipe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({
           recipe_id: recipeId,
           name,
@@ -1433,7 +1438,7 @@
 
     fetch('/delete_recipe', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ recipe_id: recipeId })
     })
       .then(response => {
@@ -1706,7 +1711,7 @@
     try {
       const response = await fetch('/execute_recipe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify(payload)
       });
 

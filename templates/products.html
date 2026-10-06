@@ -541,6 +541,7 @@
     <div class="modal-box">
       <h3>New Product</h3>
       <form id="productForm" action="/add_product" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label for="productName">Name</label>
           <input type="text" id="productName" placeholder="Product Name" name="name" required>
@@ -779,6 +780,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   // Account's chosen currency (ISO code), passed from the server.
   // Falls back to USD if the account/currency isn't set for any reason.
   const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
@@ -904,7 +909,7 @@
     try {
       const response = await fetch('/edit_product', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ product_id: productId, name, sku, price, purchase_price: purchasePrice, tax, uom })
       });
 
@@ -1029,7 +1034,7 @@
     try {
       const res = await fetch('/delete_product_image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ product_id: productId, field: field })
       });
 
@@ -1070,6 +1075,7 @@
       formData.append('product_id', productId);
       formData.append('field', field);
       formData.append('image', file);
+      formData.append('csrf_token', getCsrfToken());
 
       const res = await fetch('/upload_product_image', {
         method: 'POST',
@@ -1209,7 +1215,7 @@
   function performDelete(productId, removeBtn, confirmed) {
     fetch('/delete_product', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ product_id: productId, confirm: confirmed })
     })
       .then(async response => {

@@ -327,6 +327,7 @@
     <div class="modal-box">
       <h3>New Journal Entry</h3>
       <form id="journalForm" action="/add_entry" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label for="newDate">Date</label>
           <input type="date" id="newDate" name="date" required>
@@ -421,6 +422,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   // ---- Helper: today's date in YYYY-MM-DD for <input type="date"> ----
   function todayISO() {
     const d = new Date();
@@ -508,7 +513,7 @@
     try {
       const response = await fetch('/edit_entry', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ entry_id: entryId, date, location, journal })
       });
 
@@ -547,7 +552,7 @@
 
     fetch('/delete_entry', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ entry_id: entryId })
     })
       .then(response => {

@@ -133,6 +133,7 @@
 </div>
 
 <form class="ch-form" id="chooseHomepageForm" action="/settings/choose-homepage" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <div class="ch-field">
     <label for="homepageSelect">Select homepage</label>

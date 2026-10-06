@@ -234,6 +234,7 @@
 </div>
 
 <form class="lc-form" id="languageCurrencyForm" action="/settings/language-currency" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <div class="lc-field">
     <label for="languageSelect">Select language</label>

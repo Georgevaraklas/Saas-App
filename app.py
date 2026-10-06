@@ -14,8 +14,9 @@ import io
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from dotenv import load_dotenv
-from flask import Flask, flash, redirect, render_template, request, session, url_for, jsonify, Blueprint, send_file, abort, g, Response
+from flask import Flask, flash, redirect, render_template, request, url_for, jsonify, Blueprint, send_file, abort, g, Response, make_response
 from flask_limiter import Limiter
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from app_options import LANGUAGES, CURRENCIES, VALID_LANGUAGE_CODES, VALID_CURRENCY_CODES
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -42,6 +43,9 @@ import csv
 import secrets
 
 from currency_filter import register_currency_filter, format_currency
+
+from supabase import create_client
+from supabase.lib.client_options import ClientOptions
 
 try:
     from openpyxl import Workbook
@@ -72,12 +76,17 @@ app.secret_key = FLASK_SECRET_KEY
 # Currency Filtering
 register_currency_filter(app)
 
-# Configure secure signed-cookie sessions
-app.config["SESSION_COOKIE_SECURE"] = True
+# Flask's signed session is retained only for flash messages.
+# Authentication itself is stored in HttpOnly Supabase cookies below.
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 _original_static_view = app.view_functions.get("static")
+
+# CSRF Protection Implementation
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+csrf = CSRFProtect(app)
+
 
 # Configure PostgreSQL database (Supabase)
 # Put your Supabase PostgreSQL connection string in .env as DATABASE_URL.
@@ -130,6 +139,21 @@ class PostgresDB:
         conn = self._connection()
         try:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                # Supabase RLS context for the direct PostgreSQL connection.
+                # The authenticated user was verified by login_required and is
+                # stored in g.user_id for this request. The setting is LOCAL to
+                # the current transaction, so it cannot leak to another request
+                # when a pooled connection is reused.
+                current_uid = getattr(g, "user_id", None)
+                if current_uid:
+                    cursor.execute(
+                        "SELECT set_config('app.current_user_id', %s, true)",
+                        (str(current_uid),),
+                    )
+                else:
+                    cursor.execute(
+                        "SELECT set_config('app.current_user_id', '', true)"
+                    )
                 cursor.execute(sql, params)
                 if cursor.description is not None:
                     rows = [dict(row) for row in cursor.fetchall()]
@@ -184,6 +208,22 @@ MAX_PDF_PAGES = 10
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
 SUPABASE_STORAGE_BUCKET = os.environ.get("SUPABASE_STORAGE_BUCKET", "uploads")
+SUPABASE_PUBLISHABLE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY")  
+APP_URL = os.getenv("APP_URL", "http://127.0.0.1:5000").rstrip("/")
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+AUTH_ACCESS_COOKIE = "__Host-sb-access-token" if COOKIE_SECURE else "sb-access-token"
+AUTH_REFRESH_COOKIE = "__Host-sb-refresh-token" if COOKIE_SECURE else "sb-refresh-token"
+app.config["SESSION_COOKIE_SECURE"] = COOKIE_SECURE
+
+# Configure Supabase Client
+supabase = create_client(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY,
+    options=ClientOptions(
+        auto_refresh_token=False,
+        persist_session=False,
+    )
+)
 
 def _supabase_project_url_from_database_url(database_url):
     try:
@@ -235,16 +275,34 @@ def storage_response(path,mimetype="image/png"):
     return resp
 
 
+def _request_user_id_from_access_cookie():
+    """Return the authenticated Supabase user id for static-file requests.
+
+    Static requests do not pass through login_required, so g.user_id is not
+    populated yet. We verify the HttpOnly access token directly instead.
+    """
+    access_token = request.cookies.get(AUTH_ACCESS_COOKIE)
+    if not access_token:
+        return None
+    try:
+        user = supabase.auth.get_user(access_token).user
+        return str(user.id) if user else None
+    except Exception:
+        return None
+
+
 def _storage_static(filename):
     if filename.startswith("uploads/logos/"):
-        stored=filename.rsplit("/",1)[-1]; uid=session.get("user_id")
+        stored=filename.rsplit("/",1)[-1]; uid=_request_user_id_from_access_cookie()
         if not uid: abort(403)
-        account=db.execute("SELECT logo FROM accounts WHERE uid = ?",uid)
+        g.user_id = uid
+        account=db.execute("SELECT logo FROM profiles WHERE id = ?",uid)
         if not account or account[0].get("logo") != stored: abort(403)
         return storage_response(f"logos/{uid}.png","image/png")
     if filename.startswith("uploads/products/"):
-        stored=filename.rsplit("/",1)[-1]; uid=session.get("user_id")
+        stored=filename.rsplit("/",1)[-1]; uid=_request_user_id_from_access_cookie()
         if not uid: abort(403)
+        g.user_id = uid
         product=db.execute("SELECT id,barcode,qr_code,picture FROM products WHERE uid = ? AND (barcode = ? OR qr_code = ? OR picture = ?)",uid,stored,stored,stored)
         if not product: abort(404)
         row=product[0]; fmap={"barcode":row.get("barcode"),"qrcode":row.get("qr_code"),"picture":row.get("picture")}; field=next((f for f,v in fmap.items() if v==stored),None)
@@ -424,10 +482,10 @@ def server_error(e):
 # Account Corner
 @app.context_processor
 def inject_account():
-    if "user_id" in session:
-        uid = session["user_id"]
+    if getattr(g, "user_id", None):
+        uid = g.user_id
         account = db.execute(
-            "SELECT name, fullname, logo FROM accounts WHERE uid = ?", uid
+            "SELECT name, fullname, logo FROM profiles WHERE id = ?", uid
         )
         return {"account": account[0] if account else None}
     return {"account": None}
@@ -488,6 +546,35 @@ VALID_NOTIFY_WHEN = {
     "price": {"decrease_from", "increase_from", "changes"},
 }
 
+# Authorization Cookie Setup
+def set_auth_cookies(response, access_token, refresh_token, access_max_age=60 * 60):
+    response.set_cookie(
+        AUTH_ACCESS_COOKIE, access_token,
+        httponly=True, secure=COOKIE_SECURE, samesite="Lax", path="/",
+        max_age=access_max_age,
+    )
+    response.set_cookie(
+        AUTH_REFRESH_COOKIE, refresh_token,
+        httponly=True, secure=COOKIE_SECURE, samesite="Lax", path="/",
+        max_age=60 * 60 * 24 * 30,
+    )
+    return response
+
+def refresh_auth_session(refresh_token):
+
+    try:
+        response = supabase.auth.refresh_session(
+            refresh_token
+        )
+
+        if not response.session:
+            return None
+
+        return response.session
+
+    except Exception:
+        return None
+
 """Extra Functions"""
 
 
@@ -517,19 +604,49 @@ def apology(message, code=400):
     return render_template("apology.html", top=code, bottom=escape(message)), code
 
 
+def _authenticate_request():
+    access_token = request.cookies.get(AUTH_ACCESS_COOKIE)
+    refresh_token = request.cookies.get(AUTH_REFRESH_COOKIE)
+    user = None
+    new_session = None
+
+    if access_token:
+        try:
+            user = supabase.auth.get_user(access_token).user
+        except Exception:
+            user = None
+
+    if user is None and refresh_token:
+        try:
+            refreshed = supabase.auth.refresh_session(refresh_token)
+            new_session = refreshed.session
+            if new_session:
+                user = refreshed.user
+        except Exception:
+            user = None
+
+    return user, new_session
+
+
 def login_required(f):
-    """
-    Decorate routes to require login.
-
-    https://flask.palletsprojects.com/en/latest/patterns/viewdecorators/
-    """
-
+    """Require a valid Supabase Auth session."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if session.get("user_id") is None:
-            return redirect("/login")
-        return f(*args, **kwargs)
+        user, new_session = _authenticate_request()
+        if user is None:
+            response = redirect(url_for("login"))
+            response.delete_cookie(AUTH_ACCESS_COOKIE, path="/")
+            response.delete_cookie(AUTH_REFRESH_COOKIE, path="/")
+            return response
 
+        g.user = user
+        g.user_id = str(user.id)
+        g.auth_session = new_session
+
+        response = make_response(f(*args, **kwargs))
+        if new_session:
+            set_auth_cookies(response, new_session.access_token, new_session.refresh_token, new_session.expires_in)
+        return response
     return decorated_function
 
 def usd(value):
@@ -538,20 +655,6 @@ def usd(value):
 
 
 
-def confirm_required(f):
-    """
-    Decorate routes to require confirm.
-
-    https://flask.palletsprojects.com/en/latest/patterns/viewdecorators/
-    """
-
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get("confirm", False):
-            return redirect("/manage")
-        return f(*args, **kwargs)
-
-    return decorated_function
 
 def generate_uid():
     return str(uuid.uuid4())
@@ -601,7 +704,7 @@ def save_product_image(file_storage, product_id, field):
     except (UnidentifiedImageError,OSError,Image.DecompressionBombError): return None
     except Exception: app.logger.exception("Could not process product image"); return None
     try:
-        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(f"products/{session['user_id']}/{product_id}_{field}.png",out.getvalue())
+        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(f"products/{g.user_id}/{product_id}_{field}.png",out.getvalue())
     except Exception: app.logger.exception("Could not save product image"); return None
     return f"{product_id}_{field}.png"
 
@@ -628,21 +731,62 @@ def parse_date_to_int(date_str):
         return None
 
 
-_ocr_engine = None
-def get_ocr():
-    global _ocr_engine
-    if _ocr_engine is None:
-        try:
-            from paddleocr import PaddleOCR
-            ocr_lang = os.environ.get("OCR_LANG", "en")
-            try:
-                _ocr_engine=PaddleOCR(lang=ocr_lang,use_doc_orientation_classify=False,use_doc_unwarping=False,use_textline_orientation=False)
-            except TypeError:
-                # Compatibility with older PaddleOCR releases already used by the app.
-                _ocr_engine=PaddleOCR(use_angle_cls=True,lang=ocr_lang)
-        except Exception:
-            app.logger.exception("PaddleOCR initialization failed"); raise RuntimeError("Invoice OCR is temporarily unavailable.")
-    return _ocr_engine
+# OCR API Configuration
+
+OCR_SPACE_API_KEY = os.environ.get("OCR_SPACE_API_KEY")  # keep the key out of the code
+OCR_SPACE_URL = "https://api.ocr.space/parse/image"
+OCR_SPACE_LANGUAGE = os.environ.get("OCR_SPACE_LANGUAGE", "gre")   # your invoices use AFM, so Greek by default
+OCR_SPACE_ENGINE = os.environ.get("OCR_SPACE_ENGINE", "1")
+
+
+class OCRError(Exception):
+    pass
+
+
+def ocr_space_pdf(file_obj, filename="invoice.pdf"):
+    """Send an uploaded PDF (file object) to OCR.space and return the text in
+    '--- Page N ---' format. Nothing is saved to disk."""
+    if not OCR_SPACE_API_KEY:
+        raise OCRError("OCR_SPACE_API_KEY is not configured")
+
+    payload = {
+        "apikey": OCR_SPACE_API_KEY,
+        "language": OCR_SPACE_LANGUAGE,
+        "OCREngine": OCR_SPACE_ENGINE,
+        "isOverlayRequired": False,
+        "filetype": "PDF",
+        "scale": True,
+        "isTable": True,
+    }
+
+    file_obj.seek(0)
+    resp = requests.post(
+        OCR_SPACE_URL,
+        files={"file": (filename, file_obj, "application/pdf")},
+        data=payload,
+        timeout=120,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    if data.get("IsErroredOnProcessing"):
+        err = data.get("ErrorMessage")
+        if isinstance(err, list):
+            err = "; ".join(str(e) for e in err)
+        raise OCRError(err or "OCR.space reported a processing error")
+
+    pages = []
+    for idx, res in enumerate(data.get("ParsedResults") or []):
+        text = (res.get("ParsedText") or "").strip()
+        pages.append(f"--- Page {idx + 1} ---\n{text}")
+
+    if not pages:
+        raise OCRError("OCR.space returned no results")
+
+    return "\n\n".join(pages)
+
+
+
 
 def extract_invoice_data_with_groq(ocr_text: str, timeout: int = 30) -> dict:
     """
@@ -1384,7 +1528,7 @@ def check_and_trigger_alerts(uid, pid, alert_type, current_value, previous_value
 def customer_is_own_vat(uid, cafm):
     """
     Returns True if cafm (the customer/vendor's VAT/afm) matches this
-    account's own VAT number - either the primary one in accounts.afm
+    account's own VAT number - either the primary one in profiles.afm
     or any of the additional numbers in account_vat_numbers.
     """
     if not cafm:
@@ -1392,7 +1536,7 @@ def customer_is_own_vat(uid, cafm):
 
     cafm = str(cafm).strip()
 
-    myafm_result = db.execute("SELECT afm FROM accounts WHERE uid = ?", uid)
+    myafm_result = db.execute("SELECT afm FROM profiles WHERE id = ?", uid)
     if myafm_result and str(myafm_result[0]['afm'] or "").strip() == cafm:
         return True
 
@@ -1404,7 +1548,7 @@ def customer_is_own_vat(uid, cafm):
 
 
 def get_user_id():
-    return str(session.get("user_id") or request.remote_addr or "anonymous")
+    return str(getattr(g, "user_id", None) or request.remote_addr or "anonymous")
 RATELIMIT_STORAGE_URI=os.environ.get("RATELIMIT_STORAGE_URI") or os.environ.get("REDIS_URL") or "memory://"
 if RATELIMIT_STORAGE_URI=="memory://" and not app.debug:
     app.logger.warning("RATELIMIT_STORAGE_URI is not configured; configure Redis/Upstash for shared serverless rate limits.")
@@ -1423,19 +1567,12 @@ from errors import NotFoundError, ValidationError, AppError
 @app.route("/")
 @login_required
 def index():
-    uid = session["user_id"]
-    main_page = db.execute("SELECT main_page FROM accounts WHERE uid = ?", uid)
-    if main_page and main_page[0]["main_page"]:
-        return redirect("/" + main_page[0]["main_page"])
-    # NOTE: falls through to `None` if no main_page is set — worth deciding
-    # what should happen here (render a default dashboard? redirect to /stock?)
-    # Flagging it since it's not related to error handling per se.
-
+    return redirect(url_for("pending_orders"))
 
 @app.route("/pending_orders")
 @login_required
 def pending_orders():
-    uid = session["user_id"]
+    uid = g.user_id
     today = datetime.now().date()
 
     oid = db.execute("SELECT oid FROM dorder WHERE uid = ?", uid)
@@ -1444,8 +1581,8 @@ def pending_orders():
     for order in oid:
         order_id = order['oid']
         order_details = db.execute(
-            "SELECT cafm, order_type, rdate, tcompany, pstatus, edate FROM dorder WHERE oid = ?",
-            order_id
+            "SELECT cafm, order_type, rdate, tcompany, pstatus, edate FROM dorder WHERE oid = ? AND uid = ?",
+            order_id, uid
         )
         if not order_details:
             # This means dorder had an oid row pointing nowhere -- a real
@@ -1485,13 +1622,13 @@ def pending_orders():
 @app.route("/stock")
 @login_required
 def stock():
-    user_id = session.get("user_id")
+    user_id = getattr(g, "user_id", None)
 
     stock_rows = db.execute("""
         SELECT s.pid, s.quantity, s.location, s.rdate, s.edate,
                s.invoicen, s.lot, p.name, p.sku, p.uom
         FROM stock s
-        JOIN products p ON s.pid = p.pid
+        JOIN products p ON s.pid = p.pid AND s.uid = p.uid
         WHERE s.uid = ?
     """, user_id)
 
@@ -1522,8 +1659,8 @@ def stock():
     for order in oid_rows:
         order_id = order['oid']
         order_details = db.execute("""
-            SELECT cafm, order_type, rdate, tcompany, pstatus, edate FROM dorder WHERE oid = ?
-        """, order_id)
+            SELECT cafm, order_type, rdate, tcompany, pstatus, edate FROM dorder WHERE oid = ? AND uid = ?
+        """, order_id, user_id)
         if order_details:
             cafm = order_details[0]['cafm']
             customer_name = db.execute("SELECT name FROM sucu WHERE afm = ? AND uid = ?", cafm, user_id)
@@ -1543,7 +1680,7 @@ def stock():
 @app.route("/get_field_stock")
 @login_required
 def get_field_stock():
-    uid = session["user_id"]
+    uid = g.user_id
     field = request.args.get("field")
     value = request.args.get("value")
     pid = request.args.get("pid")
@@ -1606,7 +1743,7 @@ def get_field_stock():
 @app.route("/get_stock_item")
 @login_required
 def get_stock_item():
-    uid = session["user_id"]
+    uid = g.user_id
     stock_id = request.args.get("stock_id")
     if not stock_id:
         raise ValidationError("Missing stock_id")
@@ -1636,7 +1773,7 @@ def get_stock_item():
 @app.route("/update_stock_item", methods=["POST"])
 @login_required
 def update_stock_item():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json()
     if not data:
         raise ValidationError("No data")
@@ -1686,7 +1823,7 @@ def update_stock_item():
 @app.route("/get_lots")
 @login_required
 def get_lots():
-    uid = session["user_id"]
+    uid = g.user_id
     pid = request.args.get("pid")
     if not pid:
         raise ValidationError("PID required")
@@ -1705,7 +1842,7 @@ def get_lots():
 @app.route("/get_stock_by_pid")
 @login_required
 def get_stock_by_pid():
-    uid = session["user_id"]
+    uid = g.user_id
     pid = request.args.get("pid")
     if not pid:
         raise ValidationError("Missing pid")
@@ -1735,7 +1872,7 @@ def get_stock_by_pid():
 @app.route("/syncorder", methods=["POST"])
 @login_required
 def syncorder():
-    user_id = session.get("user_id")
+    user_id = getattr(g, "user_id", None)
     data = request.get_json()
     order_id = data.get("order_id") if data else None
     if not order_id:
@@ -1748,8 +1885,8 @@ def syncorder():
         raise NotFoundError("Order not found or not received")
 
     product_details = db.execute("""
-        SELECT id, pid, price, quantity, lot, total FROM morder WHERE oid = ?
-    """, order_id)
+        SELECT id, pid, price, quantity, lot, total FROM morder WHERE oid = ? AND uid = ?
+    """, order_id, user_id)
     if not product_details:
         raise NotFoundError("No products found in this order")
 
@@ -1777,7 +1914,7 @@ from errors import NotFoundError, ValidationError, AppError
 @login_required
 def update_stock():
     """Update a stock field inline"""
-    user_id = session.get("user_id")
+    user_id = getattr(g, "user_id", None)
 
     data = request.get_json()
     if not data:
@@ -1830,7 +1967,7 @@ def update_stock():
 @login_required
 def add_productstock():
     """Add a new product to stock (manual entry, not synced from an order)"""
-    user_id = session.get("user_id")
+    user_id = getattr(g, "user_id", None)
 
     product_id = request.form.get("product_id")
     price = request.form.get("price")
@@ -1873,7 +2010,7 @@ def add_productstock():
 @app.route("/delete_stock", methods=["POST"])
 @login_required
 def delete_stock():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json()
     stock_id = data.get("stock_id") if data else None
 
@@ -1897,7 +2034,7 @@ def delete_stock():
 @login_required
 def get_synced_orders():
     """Return all orders that already have stock entries (synced orders)."""
-    uid = session["user_id"]
+    uid = g.user_id
 
     rows = db.execute("""
         SELECT DISTINCT s.oid FROM stock s
@@ -1934,7 +2071,7 @@ def get_synced_orders():
 @login_required
 def get_stock_by_order():
     """Return all stock items for a given order, with product names and formatted dates."""
-    uid = session["user_id"]
+    uid = g.user_id
     oid = request.args.get("oid")
 
     if not oid:
@@ -1965,7 +2102,7 @@ def get_stock_by_order():
 @login_required
 def update_stock_items():
     """Batch update stock items (quantity, location, dates, invoice)."""
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json()
 
     if not data or "updates" not in data:
@@ -2042,9 +2179,9 @@ def update_stock_items():
 @app.route("/orderhistory")
 @login_required
 def orderhistory():
-    uid = session["user_id"]
+    uid = g.user_id
 
-    account_rows = db.execute("SELECT * FROM accounts WHERE uid = ?", uid)
+    account_rows = db.execute("SELECT * FROM profiles WHERE id = ?", uid)
     account = account_rows[0] if account_rows else None
 
     oid = db.execute("SELECT oid FROM dorder WHERE uid = ?", uid)
@@ -2053,12 +2190,12 @@ def orderhistory():
     for order in oid:
         order_id = order['oid']
         order_details = db.execute(
-            "SELECT cafm, order_type, rdate, tcompany, pstatus, edate, receive FROM dorder WHERE oid = ?",
-            order_id
+            "SELECT cafm, order_type, rdate, tcompany, pstatus, edate, receive FROM dorder WHERE oid = ? AND uid = ?",
+            order_id, uid
         )
         product_details = db.execute(
-            "SELECT id, pid, price, quantity, lot, total, tick FROM morder WHERE oid = ?",
-            order_id
+            "SELECT id, pid, price, quantity, lot, total, tick FROM morder WHERE oid = ? AND uid = ?",
+            order_id, uid
         )
         for product in product_details:
             product_id = product['pid']
@@ -2121,14 +2258,14 @@ def delete_order():
     except (TypeError, ValueError):
         raise ValidationError("order_id must be a valid integer")
 
-    uid = session["user_id"]
+    uid = g.user_id
 
     existing = db.execute("SELECT oid FROM dorder WHERE oid = ? AND uid = ?", order_id, uid)
     if not existing:
         raise NotFoundError(f"Order {order_id} not found")
 
-    db.execute("DELETE FROM morder WHERE oid = ?", order_id)
-    db.execute("DELETE FROM dorder WHERE oid = ?", order_id)
+    db.execute("DELETE FROM morder WHERE oid = ? AND uid = ?", order_id, uid)
+    db.execute("DELETE FROM dorder WHERE oid = ? AND uid = ?", order_id, uid)
 
     return jsonify({"success": True, "deleted_id": order_id}), 200
 
@@ -2137,15 +2274,15 @@ def delete_order():
 @app.route("/invoices")
 @login_required
 def invoices():
-    uid = session["user_id"]
+    uid = g.user_id
  
-    customers = db.execute("SELECT id, name, afm FROM sucu WHERE uid = ? AND supplier = FALSE", uid)
+    customers = db.execute("SELECT id, name, afm FROM sucu WHERE uid = ?", uid)
     PRODUCTS = db.execute("SELECT id, name, price, pid FROM products WHERE uid = ?", uid)
  
     # Seller ("YOUR COMPANY") details for the invoice header, from the logged-in user's account.
     account_rows = db.execute("""
         SELECT name, afm, phone, email, street, country, city, logo, currency
-        FROM accounts WHERE uid = ?
+        FROM profiles WHERE id = ?
     """, uid)
     account = account_rows[0] if account_rows else None
  
@@ -2309,7 +2446,7 @@ def invoices():
 @app.route("/update_invoice", methods=["POST"])
 @login_required
 def update_invoice():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True) or {}
 
     invoice_id = data.get("invoice_id")
@@ -2361,17 +2498,18 @@ def update_invoice():
 @app.route("/new_invoice", methods=["POST"])
 @login_required
 def new_invoice():
-    uid=session["user_id"]
+    uid=g.user_id
     customer_id=request.form.get("customer_id"); document_type=request.form.get("document_type"); products_raw=request.form.get("products")
     try: products=json.loads(products_raw) if products_raw else None
     except (TypeError,ValueError): flash("Invalid product data."); return redirect("/invoices")
     invoice_date=request.form.get("invoice_date"); invoice_number=request.form.get("invoice_number"); transfer_info_raw=request.form.get("transfer_info"); salesperson=request.form.get("salesperson")
     if not customer_id or not document_type or not products or not invoice_date: flash("Please fill in all required fields."); return redirect("/invoices")
-    r=db.execute("SELECT afm FROM sucu WHERE id = ? AND uid = ?",customer_id,uid)
+    r=db.execute("SELECT afm, supplier FROM sucu WHERE id = ? AND uid = ?",customer_id,uid)
     if not r: flash("Customer not found."); return redirect("/invoices")
-    cafm=r[0]["afm"]; r=db.execute("SELECT afm FROM accounts WHERE uid = ?",uid)
+    cafm=r[0]["afm"]; receive=bool(r[0]["supplier"])
+    r=db.execute("SELECT afm FROM profiles WHERE id = ?",uid)
     if not r: flash("Account VAT number not found."); return redirect("/invoices")
-    myafm=r[0]["afm"]; receive=bool(customer_is_own_vat(uid,cafm)); validated=[]
+    myafm=r[0]["afm"]; validated=[]
     for product in products:
         if not isinstance(product,dict) or not product.get("product_id") or not product.get("quantity") or not product.get("price"):
             flash("Please fill in all product fields."); return redirect("/invoices")
@@ -2396,7 +2534,7 @@ def new_invoice():
 @app.route("/delete_invoice", methods=["POST"])
 @login_required
 def delete_invoice():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True) or {}
     invoice_id = data.get("invoice_id")
 
@@ -2419,7 +2557,7 @@ def delete_invoice():
 @login_required
 def suppliers_customers():
 
-    uid = session["user_id"]
+    uid = g.user_id
 
     rows = db.execute(
         """SELECT id, name, afm, adress AS address, phone, activity, supplier,
@@ -2440,34 +2578,44 @@ def settings():
 def login():
 
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
+
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
 
         if not email or not password:
             flash("Please fill in all fields.")
             return render_template("signin.html")
 
-        rows = db.execute("SELECT * FROM accounts WHERE email = ?  ", email)
+        try:
+            auth_response = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
 
-        if len(rows) != 1 or not check_password_hash(rows[0].get("hash"), password):
+        except Exception as e:
+            print("Supabase login error:", e)
+
             flash("Invalid email or password.")
             return render_template("signin.html")
 
-        session.clear()
-        session["user_id"] = rows[0].get("uid")
+        # Supabase should return a session after successful login
+        if not auth_response.session:
+            flash("Please confirm your email before logging in.")
+            return render_template("signin.html")
 
-        return redirect("/")
+        session_data = auth_response.session
+
+        response = redirect(url_for("index"))
+        return set_auth_cookies(response, session_data.access_token, session_data.refresh_token, session_data.expires_in)
 
     return render_template("signin.html")
 
 
 @app.route("/settings/personal-details", methods=["GET", "POST"])
+@login_required
 def personal_details():
  
-    if "user_id" not in session:
-        return redirect("/login")
- 
-    rows = db.execute("SELECT * FROM accounts WHERE uid = ?", session["user_id"])
+    rows = db.execute("SELECT * FROM profiles WHERE id = ?", g.user_id)
  
     if not rows:
         flash("Account not found.")
@@ -2478,13 +2626,13 @@ def personal_details():
     # NEW: pull the account's extra VAT numbers so the page can render them
     vat_numbers = db.execute(
         "SELECT * FROM account_vat_numbers WHERE account_uid = ? ORDER BY id",
-        session["user_id"],
+        g.user_id,
     )
  
     # NEW: pull the account's extra locations so the page can render them
     locations = db.execute(
         "SELECT * FROM account_locations WHERE uid = ? ORDER BY id",
-        session["user_id"],
+        g.user_id,
     )
  
     if request.method == "POST":
@@ -2505,7 +2653,7 @@ def personal_details():
  
         logo_file = request.files.get("logo")
         if logo_file and logo_file.filename:
-            saved_filename = save_company_logo(logo_file, session["user_id"])
+            saved_filename = save_company_logo(logo_file, g.user_id)
  
             if saved_filename is None:
                 flash("That logo couldn't be uploaded. Please try a different image (PNG/JPG/GIF/WEBP, under 5MB).")
@@ -2515,13 +2663,13 @@ def personal_details():
  
         db.execute(
             """
-            UPDATE accounts
+            UPDATE profiles
             SET name = ?, fullname = ?, email = ?, phone = ?,
                 afm = ?, street = ?, city = ?, country = ?, logo = ?
-            WHERE uid = ?
+            WHERE id = ?
             """,
             name, fullname, email, phone, afm, street, city, country, logo_filename,
-            session["user_id"],
+            g.user_id,
         )
  
         flash("Your details have been updated.")
@@ -2531,12 +2679,10 @@ def personal_details():
  
  
 @app.route("/settings/personal-details/vat", methods=["POST"])
+@login_required
 @json_route
 def add_vat_number():
-    if "user_id" not in session:
-        raise AuthError("Not logged in.")
-
-    rows = db.execute("SELECT * FROM accounts WHERE uid = ?", session["user_id"])
+    rows = db.execute("SELECT * FROM profiles WHERE id = ?", g.user_id)
     if not rows:
         raise NotFoundError("Account not found.")
 
@@ -2546,38 +2692,34 @@ def add_vat_number():
 
     new_id = db.execute(
         "INSERT INTO account_vat_numbers (account_uid, vat_number) VALUES (?, ?)",
-        session["user_id"], vat_number,
+        g.user_id, vat_number,
     )
     return jsonify({"id": new_id, "vat_number": vat_number})
 
 
 @app.route("/settings/personal-details/vat/<int:vat_id>", methods=["DELETE"])
+@login_required
 @json_route
 def delete_vat_number(vat_id):
-    if "user_id" not in session:
-        raise AuthError("Not logged in.")
-
     rows = db.execute(
         "SELECT * FROM account_vat_numbers WHERE id = ? AND account_uid = ?",
-        vat_id, session["user_id"],
+        vat_id, g.user_id,
     )
     if not rows:
         raise NotFoundError("VAT number not found.")
 
     db.execute(
         "DELETE FROM account_vat_numbers WHERE id = ? AND account_uid = ?",
-        vat_id, session["user_id"],
+        vat_id, g.user_id,
     )
     return jsonify({"ok": True})
 
 
 @app.route("/settings/personal-details/location", methods=["POST"])
+@login_required
 @json_route
 def add_location():
-    if "user_id" not in session:
-        raise AuthError("Not logged in.")
-
-    rows = db.execute("SELECT * FROM accounts WHERE uid = ?", session["user_id"])
+    rows = db.execute("SELECT * FROM profiles WHERE id = ?", g.user_id)
     if not rows:
         raise NotFoundError("Account not found.")
 
@@ -2587,111 +2729,203 @@ def add_location():
 
     new_id = db.execute(
         "INSERT INTO account_locations (uid, location) VALUES (?, ?)",
-        session["user_id"], location,
+        g.user_id, location,
     )
     return jsonify({"id": new_id, "location": location})
 
 
 @app.route("/settings/personal-details/location/<int:location_id>", methods=["DELETE"])
+@login_required
 @json_route
 def delete_location(location_id):
-    if "user_id" not in session:
-        raise AuthError("Not logged in.")
-
     rows = db.execute(
         "SELECT * FROM account_locations WHERE id = ? AND uid = ?",
-        location_id, session["user_id"],
+        location_id, g.user_id,
     )
     if not rows:
         raise NotFoundError("Location not found.")
 
     db.execute(
         "DELETE FROM account_locations WHERE id = ? AND uid = ?",
-        location_id, session["user_id"],
+        location_id, g.user_id,
     )
     return jsonify({"ok": True})
 
 @app.route("/logout", methods=["POST"])
+@login_required
 def logout():
-    """Log the user out."""
 
-    # Forget any user_id (and other session data)
-    session.clear()
+    refresh_token = request.cookies.get(AUTH_REFRESH_COOKIE)
 
-    return redirect("/")
+    try:
+        if refresh_token:
+            supabase.auth.refresh_session(refresh_token)
+    except Exception:
+        pass
+
+    response = redirect("/login")
+
+    response.delete_cookie(AUTH_ACCESS_COOKIE, path="/")
+
+    response.delete_cookie(AUTH_REFRESH_COOKIE, path="/")
+
+    return response
 
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
 
     if request.method == "POST":
+
+        # -------------------------
         # Get form data
-        email = request.form.get("email")
-        bname = request.form.get("bname")
-        phone = request.form.get("phone")
-        vat = request.form.get("vat")
-        address = request.form.get("address")
-        password = request.form.get("password")
+        # -------------------------
+
+        email = request.form.get("email", "").strip().lower()
+        bname = request.form.get("bname", "").strip()
+        phone = request.form.get("phone", "").strip()
+        vat = request.form.get("vat", "").strip()
+        address = request.form.get("address", "").strip()
+        password = request.form.get("password", "")
+
+        # -------------------------
+        # Validate required fields
+        # -------------------------
 
         if not email or not bname or not phone or not vat or not address or not password:
             flash("Please fill in all fields.")
             return render_template("signup.html")
 
-        existing_user = db.execute("SELECT * FROM accounts WHERE email = ?", email)
-        if existing_user:
-            flash("Email already exists. Please use a different one.")
+        # -------------------------
+        # Create Supabase Auth user
+        # -------------------------
+
+        try:
+
+            auth_response = supabase.auth.sign_up({
+                "email": email,
+                "password": password,
+                "options": {
+                    "email_redirect_to": f"{APP_URL}/auth/confirm",
+
+                    "data": {
+                        "name": bname,
+                        "phone": phone,
+                        "afm": vat,
+                        "street": address
+                    }
+                }
+            })
+
+        except Exception as e:
+
+            print("Supabase signup error:", e)
+
+            flash("Unable to create account. Please try again.")
             return render_template("signup.html")
 
-        existing_name = db.execute("SELECT * FROM accounts WHERE name = ?", bname)
-        if existing_name:
-            flash("Business name already exists. Please use a different one.")
+        # -------------------------
+        # Make sure user was created
+        # -------------------------
+
+        user = auth_response.user
+
+        if not user:
+            flash("Unable to create account. Please try again.")
             return render_template("signup.html")
 
-        uid = generate_uid()
-        hash = generate_password_hash(password, method='scrypt', salt_length=16)
+        # -------------------------
+        # Logo
+        # -------------------------
+        #
+        # Do NOT upload the logo here.
+        #
+        # The user is not authenticated yet
+        # when email confirmation is enabled.
+        #
+        # We will handle the logo after login.
+        # -------------------------
 
-        logo_file = request.files.get("logo")
+        # -------------------------
+        # Email confirmation
+        # -------------------------
 
-        if logo_file and logo_file.filename:
-
-            if not allowed_logo_file(logo_file.filename):
-                flash("Logo must be a PNG, JPG, JPEG, or WEBP file.")
-                return render_template("signup.html")
-
-            logo_filename = save_company_logo(logo_file, uid)
-
-            if logo_filename is None:
-                flash(
-                    "The logo could not be uploaded. "
-                    "Make sure it is a valid image and does not exceed 5 MB."
-                )
-                return render_template("signup.html")
-
-        else:
-            logo_filename = None
-
-        db.execute(
-            "INSERT INTO accounts (email, name, phone, afm, street, hash, uid, logo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            email, bname, phone, vat, address, hash, uid, logo_filename
+        flash(
+            "Account created successfully. "
+            "Please check your email to confirm your account."
         )
 
-        # Log the new account in immediately so /onboarding knows who's asking
-        session.clear()
-        session["user_id"] = uid
-
-        return redirect(url_for("onboarding"))
+        return redirect(url_for("check_email"))
 
     return render_template("signup.html")
 
-@app.route("/onboarding", methods=["GET", "POST"])
-def onboarding():
-    if not session.get("user_id"):
-        return redirect(url_for("signin"))
+@app.route("/check-email")
+def check_email():
+    return render_template("check_email.html")
 
-    rows = db.execute("SELECT * FROM accounts WHERE uid = ?", session["user_id"])
+
+@app.route("/auth/confirm")
+def auth_confirm():
+
+    token_hash = request.args.get("token_hash")
+    token_type = request.args.get("type", "email")
+
+    if not token_hash:
+        flash("Invalid or missing confirmation link.")
+        return redirect(url_for("login"))
+
+    try:
+
+        auth_response = supabase.auth.verify_otp({
+            "token_hash": token_hash,
+            "type": token_type
+        })
+
+    except Exception as e:
+
+        print("Supabase email confirmation error:", e)
+
+        flash(
+            "This confirmation link is invalid or has expired. "
+            "Please request a new confirmation email."
+        )
+
+        return redirect(url_for("login"))
+
+    session_data = auth_response.session
+    user = auth_response.user
+
+    if not session_data or not user:
+        flash(
+            "Email confirmation failed. "
+            "Please try again."
+        )
+        return redirect(url_for("login"))
+
+    # ---------------------------------
+    # Store authentication tokens
+    # ---------------------------------
+
+    response = redirect(url_for("index"))
+
+    cookie_secure = (
+        os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    )
+
+    set_auth_cookies(response, session_data.access_token, session_data.refresh_token, session_data.expires_in)
+
+    flash("Your email has been confirmed successfully.")
+
+    return response
+
+@app.route("/onboarding", methods=["GET", "POST"])
+@login_required
+def onboarding():
+
+    rows = db.execute("SELECT * FROM profiles WHERE id = ?", g.user_id)
     account = rows[0] if rows else None
     if not account:
-        return redirect(url_for("signin"))
+        return redirect(url_for("login"))
 
     if request.method == "POST":
         company_name = request.form.get("company_name")
@@ -2708,14 +2942,14 @@ def onboarding():
             return render_template("onboarding.html", account=account)
 
         existing_email = db.execute(
-            "SELECT * FROM accounts WHERE email = ? AND uid != ?", email, account["uid"]
+            "SELECT * FROM profiles WHERE email = ? AND id != ?", email, g.user_id
         )
         if existing_email:
             flash("Email already exists. Please use a different one.")
             return render_template("onboarding.html", account=account)
 
         existing_name = db.execute(
-            "SELECT * FROM accounts WHERE name = ? AND uid != ?", company_name, account["uid"]
+            "SELECT * FROM profiles WHERE name = ? AND id != ?", company_name, g.user_id
         )
         if existing_name:
             flash("Business name already exists. Please use a different one.")
@@ -2727,7 +2961,7 @@ def onboarding():
             if not allowed_logo_file(logo_file.filename):
                 flash("Logo must be a PNG, JPG, JPEG, or WEBP file.")
                 return render_template("onboarding.html", account=account)
-            saved = save_company_logo(logo_file, account["uid"])
+            saved = save_company_logo(logo_file, g.user_id)
             if saved is None:
                 flash(
                     "The logo could not be uploaded. "
@@ -2737,12 +2971,12 @@ def onboarding():
             logo_filename = saved
 
         db.execute(
-            """UPDATE accounts
+            """UPDATE profiles
                SET name = ?, afm = ?, phone = ?, email = ?, country = ?, city = ?,
                    currency = ?, fullname = ?, logo = ?
-               WHERE uid = ?""",
+               WHERE id = ?""",
             company_name, vat, phone, email, country, city, currency, full_name,
-            logo_filename, account["uid"]
+            logo_filename, g.user_id
         )
 
         flash("You're all set!")
@@ -2767,7 +3001,7 @@ def add_product():
             flash("Please fill in all fields.")
             return render_template("products.html")
 
-        uid = session["user_id"]
+        uid = g.user_id
         pid = generate_random_number(8)
 
         db.execute(
@@ -2783,8 +3017,8 @@ def add_product():
 @app.route("/products")
 @login_required
 def products():
-    uid = session["user_id"]
-    account_rows = db.execute("SELECT * FROM accounts WHERE uid = ?", uid)
+    uid = g.user_id
+    account_rows = db.execute("SELECT * FROM profiles WHERE id = ?", uid)
     account = account_rows[0] if account_rows else None
     row = db.execute(
         "SELECT id, name, sku, price, purchase_price, tax, uom FROM products WHERE uid = ? AND display = TRUE",
@@ -2797,7 +3031,7 @@ def products():
 @login_required
 @json_route
 def upload_product_image():
-    uid = session["user_id"]
+    uid = g.user_id
     product_id = request.form.get("product_id")
     field = request.form.get("field")
 
@@ -2836,7 +3070,7 @@ def upload_product_image():
 @login_required
 @json_route
 def delete_product_image():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json()
     product_id = data.get("product_id")
     field = data.get("field")
@@ -2879,7 +3113,7 @@ def delete_product():
     if not product_id:
         raise ValidationError("Product ID required")
 
-    uid = session["user_id"]
+    uid = g.user_id
     product = db.execute("SELECT id, pid FROM products WHERE id = ? AND uid = ?", product_id, uid)
     if not product:
         raise NotFoundError("Product not found")
@@ -2951,7 +3185,7 @@ def edit_product():
     if not product_id or not name or price is None or not uom:
         raise ValidationError("Missing required fields")
 
-    uid = session["user_id"]
+    uid = g.user_id
     product = db.execute("SELECT id FROM products WHERE id = ? AND uid = ?", product_id, uid)
     if not product:
         raise NotFoundError("Product not found")
@@ -2989,14 +3223,14 @@ def add_sucu():
             return render_template("suppliers_customers.html")
 
         if contact_type == "supplier":
-            existing_supplier = db.execute("SELECT * FROM sucu WHERE afm = ? AND supplier = TRUE AND uid = ?", vat_number, session["user_id"])
+            existing_supplier = db.execute("SELECT * FROM sucu WHERE afm = ? AND supplier = TRUE AND uid = ?", vat_number, g.user_id)
             if existing_supplier:
                 flash("Supplier with this VAT number already exists.")
                 return render_template("suppliers_customers.html")
             supplier_flag = True
 
         elif contact_type == "customer":
-            existing_customer = db.execute("SELECT * FROM sucu WHERE afm = ? AND supplier = FALSE AND uid = ?", vat_number, session["user_id"])
+            existing_customer = db.execute("SELECT * FROM sucu WHERE afm = ? AND supplier = FALSE AND uid = ?", vat_number, g.user_id)
             if existing_customer:
                 flash("Customer with this VAT number already exists.")
                 return render_template("suppliers_customers.html")
@@ -3006,7 +3240,7 @@ def add_sucu():
             flash("Please select a valid contact type.")
             return render_template("suppliers_customers.html")
 
-        uid = session["user_id"]
+        uid = g.user_id
 
         db.execute(
             """INSERT INTO sucu
@@ -3035,7 +3269,7 @@ def edit_sucu():
     if not contact_id:
         raise ValidationError("Missing contact ID")
 
-    uid = session["user_id"]
+    uid = g.user_id
 
     existing = db.execute("SELECT * FROM sucu WHERE id = ? AND uid = ?", contact_id, uid)
     if not existing:
@@ -3085,16 +3319,16 @@ def edit_sucu():
 @app.route("/new_order", methods=["GET", "POST"])
 @login_required
 def new_order():
-    rows=db.execute("SELECT * FROM accounts WHERE uid = ?",session["user_id"]); account=rows[0] if rows else None
+    rows=db.execute("SELECT * FROM profiles WHERE id = ?",g.user_id); account=rows[0] if rows else None
     if request.method=="POST":
-        uid=session["user_id"]; customer_id=request.form['customer_id']; order_type=request.form['order_type']; products_raw=request.form.get('products')
+        uid=g.user_id; customer_id=request.form['customer_id']; order_type=request.form['order_type']; products_raw=request.form.get('products')
         try: products=json.loads(products_raw) if products_raw else None
         except (TypeError,ValueError): flash("Invalid product data."); return redirect("/new_order")
         order_date=request.form['order_date']; tcompany=request.form['transfer_company']; pstatus=request.form['payment_status']; due_date=request.form['due_date']; salesperson=request.form.get('salesperson'); comments=request.form.get('comments')
         if not customer_id or not order_type or not products or not order_date: flash("Please fill in all required fields."); return redirect("/new_order")
-        r=db.execute("SELECT afm FROM sucu WHERE id = ? AND uid = ?",customer_id,uid)
+        r=db.execute("SELECT afm, supplier FROM sucu WHERE id = ? AND uid = ?",customer_id,uid)
         if not r: flash("Customer not found."); return redirect("/new_order")
-        cafm=r[0]["afm"]; receive=bool(customer_is_own_vat(uid,cafm)); validated=[]
+        cafm=r[0]["afm"]; receive=bool(r[0]["supplier"]); validated=[]
         for product in products:
             if not isinstance(product,dict) or not product.get("product_id") or not product.get("quantity") or not product.get("price"):
                 flash("Please fill in all product fields."); return redirect("/new_order")
@@ -3106,15 +3340,15 @@ def new_order():
             db.execute("INSERT INTO dorder (uid,cafm,order_type,rdate,tcompany,pstatus,edate,receive,oid,status,salesperson,comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",uid,cafm,order_type,order_date,tcompany,pstatus,due_date,receive,oid,"pending",salesperson,comments)
             for pid,tax,product in validated:
                 db.execute("INSERT INTO morder (uid,pid,quantity,price,lot,total,oid,tax) VALUES (?,?,?,?,?,?,?,?)",uid,pid,product["quantity"],product["price"],product.get("lot_number"),product.get("subtotal"),oid,tax)
-        return redirect("/")
-    customers=db.execute("SELECT id,name,afm FROM sucu WHERE uid = ? AND supplier = FALSE",session["user_id"]); PRODUCTS=db.execute("SELECT id,name,price,pid,sku FROM products WHERE uid = ?",session["user_id"])
+        return redirect("/orderhistory")
+    customers=db.execute("SELECT id,name,afm FROM sucu WHERE uid = ?",g.user_id); PRODUCTS=db.execute("SELECT id,name,price,pid,sku FROM products WHERE uid = ?",g.user_id)
     return render_template("new_order.html",customers=customers,products=PRODUCTS,account=account)
 
 @app.route("/update_order", methods=["POST"])
 @login_required
 @json_route
 def update_order():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True) or {}
 
     row_id = data.get("row_id")
@@ -3231,37 +3465,23 @@ def scan_invoice():
         }), 400
 
 
-    # 6. Temp save
-    with tempfile.NamedTemporaryFile(
-        delete=False,
-        suffix='.pdf'
-    ) as tmp:
-
-        file.save(tmp.name)
-        tmp_path = tmp.name
 
     try:
 
-        # PaddleOCR accepts a local PDF path directly; no Poppler dependency is needed.
-        ocr_engine=get_ocr(); all_text=[]
+        # OCR via OCR.space (sent straight from memory, nothing saved to disk)
         try:
-            result=ocr_engine.predict(tmp_path)
-            for idx,res in enumerate(result):
-                payload=getattr(res,"json",{}) or {}
-                if isinstance(payload,str):
-                    try: payload=json.loads(payload)
-                    except json.JSONDecodeError: payload={}
-                inner=payload.get("res",{}) or {}; rec_texts=inner.get("rec_texts",[]) or []; page_index=inner.get("page_index")
-                page_number=(page_index+1) if isinstance(page_index,int) else idx+1
-                all_text.append(f"--- Page {page_number} ---\n"+"\n".join(rec_texts))
-        except Exception:
-            app.logger.exception("PaddleOCR PDF inference failed")
-            return jsonify({"success":False,"error":"Invoice OCR is temporarily unavailable."}),503
-        extracted_text="\n\n".join(all_text)
+            extracted_text = ocr_space_pdf(file, filename="invoice.pdf")
+        except (OCRError, requests.RequestException, ValueError):
+            app.logger.exception("OCR.space PDF processing failed")
+            return jsonify({
+                "success": False,
+                "error": "Invoice OCR is temporarily unavailable."
+            }), 503
 
         # 7. Structured extraction
-        uid = session["user_id"]                     # <-- moved up
-        missing_contacts = []                        # <-- defined before the if block
+        uid = g.user_id                     # <-- moved up
+        missing_contacts = []
+        missing_products = []
 
         try:
             invoice_data = extract_invoice_data_with_groq(extracted_text)
@@ -3368,35 +3588,36 @@ def scan_invoice():
                     except (TypeError, ValueError):
                         amount = None
 
-                    # --- NEW TAX RATE LOGIC ---
-                    # First, try to compute from unit_tax / unit_price (most reliable)
+
+                    # --- TAX RATE LOGIC ---
+                    # The LLM's unit_tax is unreliable (it sometimes returns the rate itself,
+                    # e.g. 20 or 0.2, instead of a per-unit amount), so derive the rate from
+                    # the line amount first and only fall back to unit_tax last.
                     unit_tax = p.get('unit_tax')
-                    if unit_tax is not None:
-                        try:
-                            unit_tax = float(unit_tax)
-                        except (TypeError, ValueError):
-                            unit_tax = None
+                    try:
+                        unit_tax = float(unit_tax) if unit_tax is not None else None
+                    except (TypeError, ValueError):
+                        unit_tax = None
 
+                    pretax = unit_price * qty
                     tax_rate = None
-                    if unit_tax is not None and unit_price > 0:
-                        # unit_tax is the tax amount per unit -> rate = (unit_tax / unit_price) * 100
-                        tax_rate = round((unit_tax / unit_price) * 100, 2)
-                    elif p.get('tax_rate') is not None:
-                        # Fallback to explicit tax_rate field (if provided)
-                        tax_rate = clean_tax(p.get('tax_rate'))
-                    elif unit_tax is not None and unit_price == 0:
-                        # Cannot derive rate, but maybe unit_tax is already a percentage? (unlikely)
-                        # Treat it as percentage only if it's between 0 and 100 (and not a large number)
-                        if 0 < unit_tax <= 100:
-                            tax_rate = unit_tax
-                        else:
-                            tax_rate = 0
 
-                    # If still no rate, try to derive from amount vs (unit_price * qty)
-                    if tax_rate is None and amount is not None and unit_price > 0 and qty > 0:
-                        pretax_guess = unit_price * qty
-                        if amount > pretax_guess:
-                            tax_rate = round(((amount / pretax_guess) - 1) * 100, 2)
+                    # 1) Tax-inclusive line amount vs. pretax value (840 / 700 -> 20%)
+                    if amount is not None and pretax > 0 and amount > pretax * 1.0001:
+                        guess = ((amount / pretax) - 1) * 100
+                        if 0 < guess <= 100:
+                            rounded = round(guess)
+                            tax_rate = float(rounded) if abs(guess - rounded) < 0.3 else round(guess, 2)
+
+                    # 2) Explicit rate from the extraction (a stated 0% is accepted too)
+                    if tax_rate is None and p.get('tax_rate') is not None:
+                        tax_rate = clean_tax(p.get('tax_rate'))
+
+                    # 3) Last resort: unit_tax as a per-unit amount, only if the result is plausible
+                    if tax_rate is None and unit_tax is not None and unit_price > 0:
+                        derived = (unit_tax / unit_price) * 100
+                        if 0 <= derived <= 100:
+                            tax_rate = round(derived, 2)
 
                     if tax_rate is None:
                         tax_rate = 0.0
@@ -3478,6 +3699,30 @@ def scan_invoice():
 
                                 # Optional: debug output to server console
 
+                # ---- Check products ----
+                seen_names = set()
+                for p in invoice_data['products']:
+                    pname = (p.get('name') or '').strip()
+                    key = pname.lower()
+                    if not pname or key in seen_names:
+                        continue
+                    seen_names.add(key)
+
+                    # Same matching rule that save_scanned_invoice uses
+                    exists = db.execute(
+                        "SELECT pid FROM products WHERE uid = ? AND lower(trim(name)) = lower(trim(?))",
+                        uid, pname
+                    )
+                    if not exists:
+                        missing_products.append({
+                            "name": pname,
+                            "price": p.get('price', 0),
+                            "tax_rate": p.get('tax_rate', 0),
+                            "lot": p.get('lot', ''),
+                        })
+
+
+
                 # --- NEW: Print the full extracted invoice data ---
 
                 structured_success = True
@@ -3500,7 +3745,8 @@ def scan_invoice():
             "structured_extraction_success": structured_success,
             "structured_extraction_error": structured_error,
             "invoice_data": invoice_data,
-            "missing_contacts": missing_contacts,   # now defined in all paths
+            "missing_contacts": missing_contacts,
+            "missing_products": missing_products,
         })
 
     except Exception as e:
@@ -3511,9 +3757,6 @@ def scan_invoice():
             "success": False,
             "error": "Invoice processing failed. Please try again."
         }), 500
-    finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
 
 
 
@@ -3521,7 +3764,7 @@ def scan_invoice():
 @login_required
 @json_route
 def save_scanned_invoice():
-    uid = session["user_id"]
+    uid = g.user_id
     payload = request.get_json()
 
     if not payload or not payload.get("invoice_data"):
@@ -3543,7 +3786,7 @@ def save_scanned_invoice():
         raise ValidationError(f"Customer with VAT '{customer_vat}' not found. Please add them in Contacts first.")
     cafm = customer_row[0]["afm"]
 
-    myafm_row = db.execute("SELECT afm FROM accounts WHERE uid = ?", uid)
+    myafm_row = db.execute("SELECT afm FROM profiles WHERE id = ?", uid)
     if not myafm_row:
         raise ValidationError("Account VAT number not found.")
     myafm = myafm_row[0]["afm"]
@@ -3614,11 +3857,70 @@ def save_scanned_invoice():
     return jsonify({"success": True, "oid": oid})
 
 
+@app.route("/save_scanned_products", methods=["POST"])
+@login_required
+@json_route
+def save_scanned_products():
+    uid = g.user_id
+    data = request.get_json(silent=True) or {}
+    items = data.get("products")
+
+    if not isinstance(items, list) or not items:
+        raise ValidationError("No products received")
+
+    # Validate everything BEFORE writing anything
+    cleaned = []
+    seen = set()
+    for item in items:
+        name = (item.get("name") or "").strip()
+        if not name:
+            raise ValidationError("Product name is required")
+        try:
+            price = float(item.get("price") or 0)
+        except (TypeError, ValueError):
+            raise ValidationError(f"Invalid price for product '{name}'")
+        if price < 0:
+            raise ValidationError(f"Price for '{name}' cannot be negative")
+
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append({"name": name, "price": price})
+
+
+    saved, skipped = [], []
+    for c in cleaned:
+        existing = db.execute(
+            "SELECT pid FROM products WHERE uid = ? AND lower(trim(name)) = lower(trim(?))",
+            uid, c["name"]
+        )
+        if existing:
+            skipped.append(c["name"])
+            continue
+
+        # Generate a pid that isn't already taken
+        for _ in range(10):
+            pid = generate_random_number(8)
+            if not db.execute("SELECT 1 FROM products WHERE pid = ?", pid):
+                break
+        else:
+            raise ValidationError("Could not generate a product ID. Please try again.")
+
+        db.execute(
+            "INSERT INTO products (pid, uid, name, price) VALUES (?, ?, ?, ?)",
+            pid, uid, c["name"], c["price"]
+        )
+        saved.append(c["name"])
+
+    return jsonify({"success": True, "saved": saved, "already_existed": skipped}), 200
+
+
 @app.route("/save_scanned_contact", methods=["POST"])
 @login_required
 @json_route
 def save_scanned_contact():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True) or {}
 
     contact_type = data.get("type")
@@ -3671,7 +3973,7 @@ def save_scanned_contact():
 @login_required
 @json_route
 def save_transfer_info():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True) or {}
     oid = data.get("oid")
     transfer_id = data.get("transfer_id")
@@ -3744,7 +4046,7 @@ def save_transfer_info():
 @app.route("/recipes")
 @login_required
 def recipes():
-    uid = session["user_id"]
+    uid = g.user_id
     products = db.execute(
         "SELECT pid AS id, name, uom, price FROM products WHERE uid = ? AND display = TRUE",
         uid
@@ -3796,7 +4098,7 @@ def recipes():
 @app.route("/add_recipe", methods=["POST"])
 @login_required
 def add_recipe():
-    uid = session["user_id"]
+    uid = g.user_id
     name = request.form.get("name")
     outputs_raw = request.form.get("outputs")
     ingredients_raw = request.form.get("ingredients")
@@ -3849,7 +4151,7 @@ def add_recipe():
 @login_required
 @json_route
 def edit_recipe():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True)
 
     if not data:
@@ -3899,7 +4201,7 @@ def edit_recipe():
 @login_required
 @json_route
 def delete_recipe():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True)
 
     if not data or not data.get("recipe_id"):
@@ -3920,7 +4222,7 @@ def delete_recipe():
 @login_required
 @json_route
 def execute_recipe():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True)
 
     if not data:
@@ -4006,9 +4308,9 @@ def execute_recipe():
                 row = stock_row_cache[s['stock_id']]
                 new_qty = row['quantity'] - s['quantity']
                 if new_qty <= 0:
-                    db.execute("DELETE FROM stock WHERE id = ?", s['stock_id'])
+                    db.execute("DELETE FROM stock WHERE id = ? AND uid = ?", s['stock_id'], uid)
                 else:
-                    db.execute("UPDATE stock SET quantity = ? WHERE id = ?", new_qty, s['stock_id'])
+                    db.execute("UPDATE stock SET quantity = ? WHERE id = ? AND uid = ?", new_qty, s['stock_id'], uid)
 
                 db.execute("""
                     INSERT INTO morder (oid, quantity, price, lot, total, uid, cafm, pid, tax, rid, unqrid)
@@ -4066,9 +4368,9 @@ def execute_recipe():
             new_qty = row['quantity'] - take
             remaining -= take
             if new_qty <= 0:
-                db.execute("DELETE FROM stock WHERE id = ?", row['id'])
+                db.execute("DELETE FROM stock WHERE id = ? AND uid = ?", row['id'], uid)
             else:
-                db.execute("UPDATE stock SET quantity = ? WHERE id = ?", new_qty, row['id'])
+                db.execute("UPDATE stock SET quantity = ? WHERE id = ? AND uid = ?", new_qty, row['id'], uid)
 
     oid = generate_random_number(16)
     today = date.today().isoformat()
@@ -4091,7 +4393,7 @@ def execute_recipe():
 @app.route("/execution_history")
 @login_required
 def execution_history():
-    uid = session["user_id"]
+    uid = g.user_id
     history = db.execute(
         "SELECT id, oid, rid, rname, runs, edate, forced FROM exhistory WHERE uid = ? ORDER BY id DESC",
         uid
@@ -4103,7 +4405,7 @@ def execution_history():
 @login_required
 @json_route
 def delete_execution_history():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True)
 
     if not data or not data.get("history_id"):
@@ -4125,7 +4427,7 @@ def delete_execution_history():
 @login_required
 @json_route
 def process_unreceived_order():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True)
 
     if not data:
@@ -4146,8 +4448,8 @@ def process_unreceived_order():
         raise NotFoundError("Order not found or already received.")
 
     order_items = db.execute(
-        "SELECT id, pid, quantity FROM morder WHERE oid = ?",
-        order_id
+        "SELECT id, pid, quantity FROM morder WHERE oid = ? AND uid = ?",
+        order_id, uid
     )
     if not order_items:
         raise NotFoundError("No products found in this order.")
@@ -4175,9 +4477,9 @@ def process_unreceived_order():
             new_qty = row['quantity'] - take
             remaining -= take
             if new_qty <= 0:
-                db.execute("DELETE FROM stock WHERE id = ?", row['id'])
+                db.execute("DELETE FROM stock WHERE id = ? AND uid = ?", row['id'], uid)
             else:
-                db.execute("UPDATE stock SET quantity = ? WHERE id = ?", new_qty, row['id'])
+                db.execute("UPDATE stock SET quantity = ? WHERE id = ? AND uid = ?", new_qty, row['id'], uid)
 
     # -----------------------------------------------------------------
     # Switch OFF -- unchanged. Shortage response stays a jsonify return.
@@ -4269,9 +4571,9 @@ def process_unreceived_order():
                     row = stock_row_cache[s['stock_id']]
                     new_qty = row['quantity'] - s['quantity']
                     if new_qty <= 0:
-                        db.execute("DELETE FROM stock WHERE id = ?", s['stock_id'])
+                        db.execute("DELETE FROM stock WHERE id = ? AND uid = ?", s['stock_id'], uid)
                     else:
-                        db.execute("UPDATE stock SET quantity = ? WHERE id = ?", new_qty, s['stock_id'])
+                        db.execute("UPDATE stock SET quantity = ? WHERE id = ? AND uid = ?", new_qty, s['stock_id'], uid)
                     db.execute("""
                         INSERT INTO morder (oid, quantity, price, lot, total, uid, cafm, pid, tax, rid, unqrid)
                         VALUES (?, ?, NULL, ?, NULL, ?, NULL, ?, NULL, ?, ?)
@@ -4442,7 +4744,7 @@ def process_unreceived_order():
 @login_required
 @json_route
 def get_recipe_ingredient_batches():
-    uid = session["user_id"]
+    uid = g.user_id
     rid = request.args.get("recipe_id")
     runs = request.args.get("runs")
 
@@ -4502,13 +4804,13 @@ def get_recipe_ingredient_batches():
 @login_required
 @json_route
 def preview_order_recipe_ingredients():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True)
     order_id = data.get("order_id") if data else None
     if not order_id:
         raise ValidationError("Order ID required.")
 
-    order_items = db.execute("SELECT id, pid, quantity FROM morder WHERE oid = ?", order_id)
+    order_items = db.execute("SELECT id, pid, quantity FROM morder WHERE oid = ? AND uid = ?", order_id, uid)
     if not order_items:
         raise NotFoundError("No products found in this order.")
 
@@ -4582,7 +4884,7 @@ def preview_order_recipe_ingredients():
 @login_required
 @json_route
 def get_execution_details():
-    uid = session["user_id"]
+    uid = g.user_id
     history_id = request.args.get("history_id")
     if not history_id:
         raise ValidationError("Missing history_id")
@@ -4673,7 +4975,7 @@ def get_execution_details():
 @app.route("/get_user_orders")
 @login_required
 def get_user_orders():
-    uid = session["user_id"]
+    uid = g.user_id
     oid_rows = db.execute(
         "SELECT oid, cafm, order_type, rdate, tcompany, pstatus, edate FROM dorder WHERE uid = ?", uid
     )
@@ -4695,7 +4997,7 @@ def get_user_orders():
 @login_required
 @json_route
 def link_execution_order():
-    uid = session["user_id"]
+    uid = g.user_id
     data = request.get_json(silent=True)
     if not data or "history_id" not in data or "order_id" not in data:
         raise ValidationError("Missing history_id or order_id.")
@@ -4720,8 +5022,8 @@ def link_execution_order():
 @app.route("/reports")
 @login_required
 def reports():
-    uid = session["user_id"]
-    account_rows = db.execute("SELECT * FROM accounts WHERE uid = ?", uid)
+    uid = g.user_id
+    account_rows = db.execute("SELECT * FROM profiles WHERE id = ?", uid)
     account = account_rows[0] if account_rows else None
     return render_template("reports.html", account=account)
  
@@ -4733,10 +5035,10 @@ def generate_report(report_type):
     if not handler:
         raise NotFoundError("Unknown report type")
 
-    uid = session["user_id"]
+    uid = g.user_id
     f = get_request_filters()
 
-    account_rows = db.execute("SELECT currency FROM accounts WHERE uid = ?", uid)
+    account_rows = db.execute("SELECT currency FROM profiles WHERE id = ?", uid)
     currency_code = (account_rows[0]["currency"] if account_rows and account_rows[0]["currency"] else "USD")
 
     # Kept as an explicit try/except -- already doing exactly what the
@@ -4780,7 +5082,7 @@ def generate_report(report_type):
 @app.route("/alerts", methods=["GET"])
 @login_required
 def alerts():
-    uid = session["user_id"]
+    uid = g.user_id
 
     # Products dropdown in the "New Alert" modal -- pid aliased to id so the
     # template's <option value="{{ product['id'] }}"> lines up with alerts.pid
@@ -4789,7 +5091,7 @@ def alerts():
         uid
     )
 
-    account_rows = db.execute("SELECT * FROM accounts WHERE uid = ?", uid)
+    account_rows = db.execute("SELECT * FROM profiles WHERE id = ?", uid)
     account = account_rows[0] if account_rows else None
 
     rows = db.execute(
@@ -4822,7 +5124,7 @@ def alerts():
 
     # Pre-fills the "Notify On" field with the logged-in user's email.
     # Adjust the table/column name if your users table differs.
-    user_row = db.execute("SELECT email FROM accounts WHERE uid = ?", uid)
+    user_row = db.execute("SELECT email FROM profiles WHERE id = ?", uid)
     user_email = user_row[0]["email"] if user_row else ""
 
     return render_template(
@@ -4859,7 +5161,7 @@ def add_alert():
         # price_type is only meaningful for price alerts
         price_type = None
 
-    uid = session["user_id"]
+    uid = g.user_id
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     db.execute(
@@ -4886,7 +5188,7 @@ def toggle_alert():
     if alert_id is None or active is None:
         raise ValidationError("Missing data.")
 
-    uid = session["user_id"]
+    uid = g.user_id
 
     owner = db.execute("SELECT id FROM alerts WHERE id = ? AND uid = ?", alert_id, uid)
     if not owner:
@@ -4910,7 +5212,7 @@ def delete_alert():
     if alert_id is None:
         raise ValidationError("Missing alert id.")
 
-    uid = session["user_id"]
+    uid = g.user_id
 
     owner = db.execute("SELECT id FROM alerts WHERE id = ? AND uid = ?", alert_id, uid)
     if not owner:
@@ -4923,7 +5225,7 @@ def delete_alert():
 @app.route("/journal", methods=["GET"])
 @login_required
 def journal():
-    uid = session["user_id"]
+    uid = g.user_id
 
     rows = db.execute(
         "SELECT id, date, location, journal FROM journal_entries WHERE uid = ? ORDER BY date DESC",
@@ -4944,7 +5246,7 @@ def add_entry():
         flash("Please select a date.")
         return redirect("/journal")
 
-    uid = session["user_id"]
+    uid = g.user_id
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     db.execute(
@@ -4973,7 +5275,7 @@ def edit_entry():
     if not entry_id or not date:
         raise ValidationError("Date is required.")
 
-    uid = session["user_id"]
+    uid = g.user_id
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     rows_changed = db.execute(
@@ -5001,7 +5303,7 @@ def delete_entry():
     if not entry_id:
         raise ValidationError("Missing entry id.")
 
-    uid = session["user_id"]
+    uid = g.user_id
 
     rows_changed = db.execute(
         "DELETE FROM journal_entries WHERE id = ? AND uid = ?",
@@ -5029,7 +5331,7 @@ def delete_transfer_info():
     except (TypeError, ValueError):
         raise ValidationError("order_id must be a valid integer")
 
-    uid = session["user_id"]
+    uid = g.user_id
 
     existing = db.execute("SELECT oid FROM dorder WHERE oid = ? AND uid = ?", order_id, uid)
     if not existing:
@@ -5047,7 +5349,7 @@ def delete_transfer_info():
 @app.route("/uploads/logos/<filename>")
 @login_required
 def uploaded_logo(filename):
-    uid=session["user_id"]; account=db.execute("SELECT logo FROM accounts WHERE uid = ?",uid)
+    uid=g.user_id; account=db.execute("SELECT logo FROM profiles WHERE id = ?",uid)
     if not account or account[0]["logo"] != filename: abort(403)
     return storage_response(f"logos/{uid}.png","image/png")
 
@@ -5056,12 +5358,10 @@ def help_center():
     return render_template("help.html")
 
 @app.route("/settings/language-currency", methods=["GET", "POST"])
+@login_required
 def language_currency():
 
-    if "user_id" not in session:
-        return redirect("/login")
-
-    rows = db.execute("SELECT * FROM accounts WHERE uid = ?", session["user_id"])
+    rows = db.execute("SELECT * FROM profiles WHERE id = ?", g.user_id)
 
     if not rows:
         flash("Account not found.")
@@ -5084,8 +5384,8 @@ def language_currency():
             )
 
         db.execute(
-            "UPDATE accounts SET language = ?, currency = ? WHERE uid = ?",
-            language, currency, session["user_id"],
+            "UPDATE profiles SET language = ?, currency = ? WHERE id = ?",
+            language, currency, g.user_id,
         )
 
         flash("Language and currency updated.")
@@ -5100,12 +5400,10 @@ def language_currency():
     )
 
 @app.route("/settings/choose-homepage", methods=["GET", "POST"])
+@login_required
 def choose_homepage():
  
-    if "user_id" not in session:
-        return redirect("/login")
- 
-    rows = db.execute("SELECT * FROM accounts WHERE uid = ?", session["user_id"])
+    rows = db.execute("SELECT * FROM profiles WHERE id = ?", g.user_id)
  
     if not rows:
         flash("Account not found.")
@@ -5127,8 +5425,8 @@ def choose_homepage():
         main_page = HOMEPAGE_OPTIONS[homepage]
  
         db.execute(
-            "UPDATE accounts SET main_page = ? WHERE uid = ?",
-            main_page, session["user_id"],
+            "UPDATE profiles SET main_page = ? WHERE id = ?",
+            main_page, g.user_id,
         )
  
         flash("Homepage updated.")
@@ -5144,6 +5442,10 @@ def choose_homepage():
 @login_required
 def terms_of_use():
     return render_template("terms_of_use.html")
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    return "CSRF validation failed.", 400
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -26,6 +26,8 @@
       <div class="error-msg" id="loginError">Invalid email or password.</div>
 
       <form id="loginForm" class="active" action="/login" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
         <div class="field">
           <label for="loginUser">Email</label>
           <div class="input-wrap">

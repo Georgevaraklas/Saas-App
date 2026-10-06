@@ -108,6 +108,50 @@
 
     <style>
       /* =======================================================
+         SKELETON LOADERS — page title + account/avatar area
+         ======================================================= */
+      @keyframes skeleton-pulse {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+      .skeleton {
+        color: transparent !important;
+        background: linear-gradient(90deg, #ECECEE 25%, #F5F5F6 37%, #ECECEE 63%);
+        background-size: 400% 100%;
+        animation: skeleton-pulse 1.4s ease-in-out infinite;
+        border-radius: 6px;
+        pointer-events: none;
+      }
+      .skeleton * { visibility: hidden; }
+
+      #pageTitle.skeleton.skeleton-title {
+        display: inline-block;
+        width: 140px;
+        height: 15px;
+      }
+
+      .account-name.skeleton.skeleton-name {
+        display: inline-block;
+        width: 90px;
+        height: 13px;
+      }
+      .account-id.skeleton.skeleton-id {
+        display: inline-block;
+        width: 70px;
+        height: 11px;
+        margin-top: 4px;
+      }
+
+      .avatar-skeleton.skeleton {
+        display: inline-block;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+      }
+    </style>
+
+    <style>
+      /* =======================================================
          ΤΕΦΤΕΡΙ — boxed / rounded app shell (narrow sidebar)
 
          NOTE ON THE FAINT-TEXT BUG: the previous version's nav
@@ -437,7 +481,7 @@
     </div>
 
     <div class="sidebar-scroll">
-      {% if session["user_id"] %}
+      {% if g.user_id %}
         <ul class="nav" id="navList">
           <li><button class="msbutton" id="homeBtn" data-page="/">
             <span class="nav-icon-chip"><svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 10 3l7 6.5"/><path d="M5 8v8h10V8"/></svg></span>
@@ -543,21 +587,22 @@
         <button class="sidebar-toggle" id="sidebarToggle" aria-label="Άνοιγμα μενού" aria-expanded="false">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
         </button>
-        <div id="pageTitle"></div>
+        <div id="pageTitle" class="skeleton skeleton-title"></div>
       </div>
 
-      {% if session["user_id"] %}
+      {% if g.user_id %}
         <div class="account-menu-wrap" id="accountMenuWrap">
           <button class="account-btn" id="accountBtn" title="Στοιχεία λογαριασμού"
                   data-company="{{ account.name if account else '' }}"
                   data-fullname="{{ account.fullname if account else '' }}">
             <span class="account-text">
-              <div class="account-name"><strong>{{ account.name if account else '' }}</strong></div>
-              <div class="account-id">{{ account.fullname if account else '' }}</div>
+              <div class="account-name skeleton skeleton-name"><strong>{{ account.name if account else '' }}</strong></div>
+              <div class="account-id skeleton skeleton-id">{{ account.fullname if account else '' }}</div>
             </span>
             <span class="avatar">
               {% if account and account.logo %}
-                <img id="accountLogoImg" class="account-logo-img" src="{{ url_for('uploaded_logo', filename=account.logo) }}" alt="logo">
+                <span class="avatar-skeleton skeleton" id="accountAvatarSkeleton"></span>
+                <img id="accountLogoImg" class="account-logo-img" src="{{ url_for('uploaded_logo', filename=account.logo) }}" alt="logo" style="display:none;">
               {% else %}
                 &#128100;
               {% endif %}
@@ -588,6 +633,7 @@
             <ul class="account-dropdown-list">
               <li class="logout">
                 <form action="/logout" method="post" style="margin:0;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit">Log out</button>
                 </form>
               </li>
@@ -618,7 +664,9 @@
 
 <script>
   // Sidebar navigation (click handler)
-  const navList = document.getElementById('navList');
+  // Listen on the whole sidebar scroll area (not just #navList) so the
+  // Settings button in .sidebar-foot is covered by the same handlers.
+  const navList = document.querySelector('.sidebar-scroll');
   const pageTitle = document.getElementById('pageTitle');
   const announcementText = document.getElementById('announcementText');
 
@@ -631,7 +679,10 @@
     btn.closest('li').classList.add('active');
     // Update page title etc. (if they exist)
     const page = btn.dataset.page;
-    if (pageTitle) pageTitle.textContent = btn.querySelector('span:last-child') ? btn.querySelector('span:last-child').textContent : page;
+    if (pageTitle) {
+      pageTitle.textContent = btn.querySelector('span:last-child') ? btn.querySelector('span:last-child').textContent : page;
+      pageTitle.classList.remove('skeleton', 'skeleton-title');
+    }
     if (announcementText) announcementText.textContent = 'Δεν υπάρχουν ανακοινώσεις.';
     // Remember which button was clicked so it stays highlighted after
     // the full page navigation below reloads the page.
@@ -658,6 +709,29 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') accountDropdownEl.classList.remove('show');
     });
+  }
+
+  // Account name/company are already server-rendered, so their skeleton
+  // just needs to be cleared once the page has settled.
+  document.querySelectorAll('.account-name.skeleton, .account-id.skeleton').forEach((el) => {
+    el.classList.remove('skeleton', 'skeleton-name', 'skeleton-id');
+  });
+
+  // Avatar skeleton -> swap to the real image once it has actually loaded
+  // (or reveal gracefully on error), rather than assuming it's instant.
+  const accountLogoImgEl = document.getElementById('accountLogoImg');
+  const accountAvatarSkeletonEl = document.getElementById('accountAvatarSkeleton');
+  if (accountLogoImgEl && accountAvatarSkeletonEl) {
+    const revealAvatar = () => {
+      accountAvatarSkeletonEl.style.display = 'none';
+      accountLogoImgEl.style.display = 'block';
+    };
+    if (accountLogoImgEl.complete) {
+      revealAvatar();
+    } else {
+      accountLogoImgEl.addEventListener('load', revealAvatar);
+      accountLogoImgEl.addEventListener('error', revealAvatar);
+    }
   }
 
   // Redirect buttons (using data-page to avoid duplicated listeners)
@@ -723,6 +797,7 @@
         const span = activeBtn.querySelector('span:last-child');
         pageTitle.textContent = span ? span.textContent : '';
       }
+      pageTitle.classList.remove('skeleton', 'skeleton-title');
     }
   });
 

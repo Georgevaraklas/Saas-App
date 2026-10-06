@@ -474,6 +474,8 @@
 
 {% block main %}
 
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="csrfTokenHolder">
+
 <div class="page rpt-page">
 
   <br><br>
@@ -817,6 +819,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.getElementById('csrfTokenHolder');
+  return el ? el.value : '';
+}
   (function () {
     // Account's chosen currency (ISO code), passed from the server.
     // Falls back to USD if the account/currency isn't set for any reason.
@@ -1031,7 +1037,7 @@
 
       fetch(`/reports/${reportType}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify(payload)
       })
         .then(async (res) => {

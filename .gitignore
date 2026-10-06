@@ -12,6 +12,7 @@ __pycache__/
 .venv/
 venv/
 env/
+venv_packages.txt
 
 # IDE
 .vscode/

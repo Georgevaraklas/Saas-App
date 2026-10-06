@@ -507,6 +507,7 @@
       <h3>New Contact</h3>
 
       <form id="productForm" action="/add_sucu" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <h4 class="form-section-title">Contact Information</h4>
 
@@ -600,6 +601,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   const openBtn = document.getElementById('openFormBtn');
   const overlay = document.getElementById('overlay');
   const cancelBtn = document.getElementById('cancelBtn');
@@ -774,7 +779,7 @@
 
     fetch('/edit_sucu', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify(payload)
     })
     .then(response => response.json())
@@ -883,7 +888,7 @@
 
     fetch('/delete_sucu', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ contact_id: contactId })
     })
       .then(response => {

@@ -1242,6 +1242,7 @@
       <h3>New Invoice</h3>
 
       <form id="invoiceForm" action="/new_invoice" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <h4 class="form-section-title">Invoice Details</h4>
 
@@ -1249,7 +1250,7 @@
           <div class="field">
             <label for="InvCustomerSearchInput">Customer</label>
             <div class="customer-search" id="InvCustomerSearchWrap">
-              <input type="text" id="InvCustomerSearchInput" class="customer-search-input" placeholder="Search customer..." autocomplete="off">
+              <input type="text" id="InvCustomerSearchInput" class="customer-search-input" placeholder="Contact Name" autocomplete="off">
               <input type="hidden" id="InvCustomer" name="customer_id" value="">
               <div class="customer-search-results" id="InvCustomerSearchResults">
                 {% for customer in customers %}
@@ -1583,6 +1584,35 @@
     </div>
   </div>
 
+  <!-- ========== Save Missing Products Modal ========== -->
+  <div class="modal-overlay" id="saveProductsModal">
+    <div class="modal-box scan-confirm-box" style="width: 560px;">
+      <h3>Save New Products?</h3>
+      <p style="color: #666; font-size: 14px; margin-bottom: 16px;">These products were not found in your products list. Would you like to save them?</p>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 32px;"></th>
+              <th>Product</th>
+              <th>Price</th>
+              <th>Tax</th>
+            </tr>
+          </thead>
+          <tbody id="save-products-body">
+            <!-- filled by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-secondary" id="saveProductsSkipBtn" type="button">Skip</button>
+        <button class="btn-primary" id="saveProductsSaveBtn" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ========== Drop Overlay (full-screen blur) ========== -->
   <div class="drop-overlay" id="dropOverlay">
     <div class="drop-text">
@@ -1603,6 +1633,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   // Account's chosen currency (ISO code), passed from the server.
   // Falls back to USD if the account/currency isn't set for any reason.
   const accountCurrency = {{ (account.currency if account and account.currency else 'USD') | tojson }};
@@ -2490,7 +2524,7 @@
 
     fetch('/save_transfer_info', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ oid, ...transferInfo })
     })
       .then(response => {
@@ -2616,7 +2650,7 @@
 
       fetch('/update_invoice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({
           invoice_id: invoiceId,
           field: field,
@@ -2731,7 +2765,7 @@
 
     fetch('/delete_invoice', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ invoice_id: invoiceId })
     })
       .then(response => {
@@ -2914,6 +2948,13 @@
     let pendingMissingContacts = [];
     let currentMissingContact = null;
 
+    // --- Save Products Modal elements ---
+    const saveProductsModal = document.getElementById('saveProductsModal');
+    const saveProductsBody = document.getElementById('save-products-body');
+    const saveProductsSkipBtn = document.getElementById('saveProductsSkipBtn');
+    const saveProductsSaveBtn = document.getElementById('saveProductsSaveBtn');
+    let pendingMissingProducts = [];
+
     // --- helpers ---
     function esc(value) {
       const div = document.createElement('div');
@@ -3042,10 +3083,8 @@
         const next = pendingMissingContacts.shift();
         openSaveContactModal(next);
       } else {
-        // All contacts handled → show invoice confirmation
-        if (currentScannedData) {
-          openScanConfirmModal({ invoice_data: currentScannedData });
-        }
+        // All contacts handled → check for unregistered products
+        processMissingProducts();
       }
     }
 
@@ -3063,7 +3102,7 @@
       try {
         const response = await fetch('/save_scanned_contact', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
           body: JSON.stringify(currentMissingContact)
         });
         const result = await response.json();
@@ -3084,6 +3123,83 @@
       if (e.target === saveContactModal) {
         closeSaveContactModal();
         processNextMissingContact();
+      }
+    });
+
+    // --- Save Products Modal flow ---
+    function openSaveProductsModal() {
+      saveProductsBody.innerHTML = pendingMissingProducts.map((p, i) => `
+        <tr>
+          <td><input type="checkbox" class="save-product-check" data-index="${i}" checked></td>
+          <td>${esc(p.name || '-')}</td>
+          <td>${Number(p.price || 0).toFixed(2)}</td>
+          <td>${Number(p.tax_rate || 0)}%</td>
+        </tr>
+      `).join('');
+      saveProductsModal.classList.add('open');
+    }
+
+    function closeSaveProductsModal() {
+      saveProductsModal.classList.remove('open');
+    }
+
+    function showScanConfirmAfterProducts() {
+      pendingMissingProducts = [];
+      if (currentScannedData) {
+        openScanConfirmModal({ invoice_data: currentScannedData });
+      }
+    }
+
+    function processMissingProducts() {
+      if (pendingMissingProducts.length > 0) {
+        openSaveProductsModal();
+      } else {
+        showScanConfirmAfterProducts();
+      }
+    }
+
+    saveProductsSkipBtn.addEventListener('click', () => {
+      closeSaveProductsModal();
+      showScanConfirmAfterProducts();
+    });
+
+    saveProductsSaveBtn.addEventListener('click', async () => {
+      const selected = [...saveProductsBody.querySelectorAll('.save-product-check:checked')]
+        .map(cb => pendingMissingProducts[Number(cb.dataset.index)]);
+
+      if (selected.length === 0) {
+        closeSaveProductsModal();
+        showScanConfirmAfterProducts();
+        return;
+      }
+
+      saveProductsSaveBtn.disabled = true;
+      saveProductsSaveBtn.textContent = 'Saving…';
+
+      try {
+        const response = await fetch('/save_scanned_products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+          body: JSON.stringify({ products: selected })
+        });
+        const result = await response.json();
+        if (!result.success) {
+          alert(`Error saving products: ${result.error}`);
+        }
+      } catch (err) {
+        alert(`Save products failed: ${err.message}`);
+      } finally {
+        saveProductsSaveBtn.disabled = false;
+        saveProductsSaveBtn.textContent = 'Save';
+        closeSaveProductsModal();
+        showScanConfirmAfterProducts();
+      }
+    });
+
+    saveProductsModal.addEventListener('click', (e) => {
+      if (e.target === saveProductsModal) {
+        closeSaveProductsModal();
+        showScanConfirmAfterProducts();
       }
     });
 
@@ -3398,7 +3514,7 @@
     try {
       const response = await fetch('/save_scanned_invoice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ invoice_data: invoiceData })
       });
       const result = await response.json();
@@ -3430,17 +3546,21 @@
 
       const formData = new FormData();
       formData.append('file', selectedFile);
+      formData.append('csrf_token', getCsrfToken());
 
       try {
         const response = await fetch('/scan_invoice', { method: 'POST', body: formData });
         const data = await response.json();
 
         if (data.success) {
-          if (data.missing_contacts && data.missing_contacts.length > 0) {
-            // Close scan modal and walk through missing contacts first
+          const hasMissingContacts = data.missing_contacts && data.missing_contacts.length > 0;
+          const hasMissingProducts = data.missing_products && data.missing_products.length > 0;
+          if (hasMissingContacts || hasMissingProducts) {
+            // Close scan modal; walk through missing contacts, then missing products
             scannedInvoiceData = data.invoice_data;
             currentScannedData = data.invoice_data;
-            pendingMissingContacts = [...data.missing_contacts];
+            pendingMissingContacts = [...(data.missing_contacts || [])];
+            pendingMissingProducts = [...(data.missing_products || [])];
             closeAIModal();
             processNextMissingContact();
           } else if (data.invoice_data) {

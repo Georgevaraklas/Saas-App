@@ -82,6 +82,7 @@
 <div class="page">
     
 <form id="orderForm" action="/new_order" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       
   <div class="mtopbar">
     <button class="back-btn" id="mmback-btn" type="button">&larr; Back to Orders</button>
@@ -96,7 +97,7 @@
     <div class="field">
       <label>Business Name</label>
       <div class="customer-search" id="customer-search">
-        <input type="text" id="customer-search-input" class="customer-search-input" placeholder="Customer Name" autocomplete="off">
+        <input type="text" id="customer-search-input" class="customer-search-input" placeholder="Contact Name" autocomplete="off">
         <input type="hidden" id="customer-select" name="customer_id" value="">
         <div class="customer-search-results" id="customer-search-results">
           {% for customer in customers %}

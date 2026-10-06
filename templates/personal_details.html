@@ -322,6 +322,7 @@
 </div>
 
 <form class="pd-form" id="personalDetailsForm" action="/settings/personal-details" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
   <div class="pd-section">
     <h3 class="pd-section-title">Account</h3>
@@ -452,6 +453,10 @@
 </form>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   const pdForm = document.getElementById('personalDetailsForm');
   const pdActions = document.getElementById('pdActions');
   const pdAvatarPreview = document.getElementById('pdAvatarPreview');
@@ -542,6 +547,7 @@
     removeBtn.disabled = true;
     fetch('/settings/personal-details/vat/' + encodeURIComponent(vatId), {
       method: 'DELETE',
+      headers: { 'X-CSRFToken': getCsrfToken() },
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
@@ -569,6 +575,7 @@
     input.disabled = true;
     const body = new URLSearchParams();
     body.set('afm_extra', value);
+    body.set('csrf_token', getCsrfToken());
 
     fetch('/settings/personal-details/vat', {
       method: 'POST',
@@ -664,6 +671,7 @@
     removeBtn.disabled = true;
     fetch('/settings/personal-details/location/' + encodeURIComponent(locationId), {
       method: 'DELETE',
+      headers: { 'X-CSRFToken': getCsrfToken() },
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
@@ -690,6 +698,7 @@
     input.disabled = true;
     const body = new URLSearchParams();
     body.set('location', value);
+    body.set('csrf_token', getCsrfToken());
 
     fetch('/settings/personal-details/location', {
       method: 'POST',

@@ -556,6 +556,7 @@
     <div class="modal-box">
       <h3>New Alert</h3>
       <form id="alertForm" action="/add_alert" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <div class="form-group">
           <label for="alertTypeSelect">Alert Type</label>
@@ -636,15 +637,15 @@
                 data-alert-id="{{ alert['id'] }}"
                 data-product="{{ alert['alert_on'] }}"
                 data-status="{{ alert['status'] }}">
-              <td class="alert-when">
+              <td class="alert-when skeleton">
                 {% if alert['alert_type'] == 'price' and alert['price_type'] %}
                   {{ 'Purchase Price' if alert['price_type'] == 'purchase_price' else 'Selling Price' }} {{ alert['alert_when'] | currency(account.currency if account else 'USD') }}
                 {% else %}
                   {{ alert['alert_when'] }}
                 {% endif %}
               </td>
-              <td class="alert-on">{{ alert['alert_on'] }}</td>
-              <td class="alert-status"><span class="status-pill">{{ alert['status'] }}</span></td>
+              <td class="alert-on skeleton">{{ alert['alert_on'] }}</td>
+              <td class="alert-status"><span class="status-pill skeleton">{{ alert['status'] }}</span></td>
               <td>
                 <label class="alert-switch">
                   <input type="checkbox" class="alert-toggle" data-alert-id="{{ alert['id'] }}" {% if alert['active'] %}checked{% endif %}>
@@ -670,6 +671,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   // ---- Products available for alert creation ----
   const PRODUCTS = {{ products | tojson }};
 
@@ -928,6 +933,12 @@
   // ---- Table body events: toggle switch + remove button ----
   const alertsTableBody = document.getElementById('alertsTableBody');
 
+  // Rows are already server-rendered by the time this script runs, so just
+  // clear their initial skeleton state (mirrors layout.html's topbar).
+  alertsTableBody.querySelectorAll('.skeleton').forEach((el) => {
+    el.classList.remove('skeleton');
+  });
+
   alertsTableBody.addEventListener('click', (e) => {
     const removeBtn = e.target.closest('.remove-btn');
     if (removeBtn) {
@@ -951,7 +962,7 @@
 
     fetch('/toggle_alert', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ alert_id: alertId, active })
     })
       .then(response => {
@@ -986,7 +997,7 @@
 
     fetch('/delete_alert', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ alert_id: alertId })
     })
       .then(response => {

@@ -585,6 +585,8 @@
 
 {% block main %}
 
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" id="csrfTokenHolder">
+
 <div class="oh-wrap">
 
   <div class="oh-header">
@@ -831,6 +833,10 @@
 <script type="application/json" id="orders-data">{{ orders | default([]) | tojson }}</script>
 
 <script>
+function getCsrfToken() {
+  const el = document.getElementById('csrfTokenHolder');
+  return el ? el.value : '';
+}
   const ordersData = JSON.parse(document.getElementById('orders-data').textContent);
 
   // Account's chosen currency (ISO code), passed from the server.
@@ -1157,7 +1163,7 @@
 
     fetch('/save_transfer_info', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ oid: orderId, ...transferInfo })
     })
       .then(response => {
@@ -1322,7 +1328,7 @@
 
     fetch('/delete_order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ order_id: orderId })
     })
       .then(response => {

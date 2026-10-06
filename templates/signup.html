@@ -24,6 +24,8 @@
       <p class="page-sub">Create an account to continue.</p>
 
       <form id="loginForm" class="active" action="/signup" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
         <div class="field">
           <label>Company Logo (optional)</label>
           <div class="logo-upload-wrap" id="logoUploadWrap">

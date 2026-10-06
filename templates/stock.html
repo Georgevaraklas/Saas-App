@@ -889,6 +889,7 @@
     <div class="popup-overlay" id="overlay">
       <div class="popup-modal">
         <form id="productForm" action="/add_productstock" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <h2>New Stock Item</h2>
 
           <label for="productSearchInput">Product</label>
@@ -1202,6 +1203,10 @@
 </div>
 
 <script>
+function getCsrfToken() {
+  const el = document.querySelector('input[name="csrf_token"]');
+  return el ? el.value : '';
+}
   // --- Add Product Popup ---
   const overlay = document.getElementById('overlay');
   const openFormBtn = document.getElementById('openFormBtn');
@@ -1353,7 +1358,7 @@
 
     fetch('/syncorder', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ order_id: orderId })
     })
       .then(response => {
@@ -1547,7 +1552,7 @@
     try {
       const response = await fetch('/preview_order_recipe_ingredients', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ order_id: orderId })
       });
       const data = await response.json();
@@ -1625,7 +1630,7 @@
 
     fetch('/process_unreceived_order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify(payload)
     })
       .then(response => response.json().then(data => ({ ok: response.ok, data })))
@@ -1891,7 +1896,7 @@
 
     fetch('/delete_stock', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ stock_id: stockId })
     })
       .then(response => response.json())
@@ -2095,7 +2100,7 @@
 
     fetch('/update_stock_item', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify(payload)
     })
       .then(response => {

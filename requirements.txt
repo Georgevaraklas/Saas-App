@@ -16,3 +16,4 @@ PyJWT
 cryptography
 requests
 supabase
+supabase.lib.client_options

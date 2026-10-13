@@ -15,5 +15,4 @@ reportlab
 PyJWT
 cryptography
 requests
-supabase
-supabase.lib.client_options
+supabase==2.23.0

@@ -214,6 +214,8 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 AUTH_ACCESS_COOKIE = "__Host-sb-access-token" if COOKIE_SECURE else "sb-access-token"
 AUTH_REFRESH_COOKIE = "__Host-sb-refresh-token" if COOKIE_SECURE else "sb-refresh-token"
 app.config["SESSION_COOKIE_SECURE"] = COOKIE_SECURE
+LOGO_BUCKET = "company-logos"
+PRODUCT_BUCKET = "product-images"
 
 # Configure Supabase Client
 supabase = create_client(
@@ -243,35 +245,47 @@ def _storage_headers(content_type=None):
     if content_type: h["Content-Type"]=content_type
     return h
 
-def _storage_object_url(path):
+def _storage_object_url(bucket, path):
     from urllib.parse import quote
-    return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{quote(SUPABASE_STORAGE_BUCKET,safe='')}/{quote(path,safe='/')}"
+    return f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/{quote(bucket, safe='')}/{quote(path, safe='/')}"
 
-def storage_upload(path,data,content_type="image/png"):
-    try:
-        r=requests.post(_storage_object_url(path),headers={**_storage_headers(content_type),"x-upsert":"true"},data=data,timeout=20); r.raise_for_status()
-    except requests.RequestException:
-        app.logger.exception("Supabase Storage upload failed"); raise RuntimeError("Could not store the uploaded file.")
 
-def storage_delete(path):
+def storage_upload(bucket, path, data, content_type="image/png"):
     try:
-        from urllib.parse import quote
-        url=f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/remove/{quote(SUPABASE_STORAGE_BUCKET,safe='')}"
-        r=requests.post(url,headers=_storage_headers("application/json"),json={"prefixes":[path]},timeout=20); r.raise_for_status()
-    except requests.RequestException:
-        app.logger.exception("Supabase Storage delete failed"); raise RuntimeError("Could not remove the stored file.")
-
-def storage_response(path,mimetype="image/png"):
-    try:
-        from urllib.parse import quote
-        url=f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/authenticated/{quote(SUPABASE_STORAGE_BUCKET,safe='')}/{quote(path,safe='/')}"
-        r=requests.get(url,headers=_storage_headers(),timeout=20)
-        if r.status_code==404: abort(404)
+        r = requests.post(_storage_object_url(bucket, path),
+                          headers={**_storage_headers(content_type), "x-upsert": "true"},
+                          data=data, timeout=20)
         r.raise_for_status()
     except requests.RequestException:
-        app.logger.exception("Supabase Storage download failed"); abort(503)
-    resp=Response(r.content,mimetype=mimetype)
-    resp.headers["Cache-Control"]="no-cache, max-age=0"
+        app.logger.exception("Supabase Storage upload failed")
+        raise RuntimeError("Could not store the uploaded file.")
+
+
+def storage_delete(bucket, path):
+    try:
+        from urllib.parse import quote
+        url = f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/remove/{quote(bucket, safe='')}"
+        r = requests.post(url, headers=_storage_headers("application/json"),
+                          json={"prefixes": [path]}, timeout=20)
+        r.raise_for_status()
+    except requests.RequestException:
+        app.logger.exception("Supabase Storage delete failed")
+        raise RuntimeError("Could not remove the stored file.")
+
+def storage_response(bucket, path, mimetype="image/png"):
+    try:
+        from urllib.parse import quote
+        url = (f"{SUPABASE_URL.rstrip('/')}/storage/v1/object/authenticated/"
+               f"{quote(bucket, safe='')}/{quote(path, safe='/')}")
+        r = requests.get(url, headers=_storage_headers(), timeout=20)
+        if r.status_code == 404:
+            abort(404)
+        r.raise_for_status()
+    except requests.RequestException:
+        app.logger.exception("Supabase Storage download failed")
+        abort(503)
+    resp = Response(r.content, mimetype=mimetype)
+    resp.headers["Cache-Control"] = "no-cache, max-age=0"
     return resp
 
 
@@ -682,7 +696,7 @@ def save_company_logo(file_storage, uid):
     except (UnidentifiedImageError,OSError,Image.DecompressionBombError): return None
     except Exception: app.logger.exception("Could not process company logo"); return None
     try:
-        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(f"logos/{uid}.png",out.getvalue())
+        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(LOGO_BUCKET, f"{uid}.png", out.getvalue())
     except Exception: app.logger.exception("Could not save company logo"); return None
     return f"{uid}.png"
 
@@ -704,7 +718,7 @@ def save_product_image(file_storage, product_id, field):
     except (UnidentifiedImageError,OSError,Image.DecompressionBombError): return None
     except Exception: app.logger.exception("Could not process product image"); return None
     try:
-        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(f"products/{g.user_id}/{product_id}_{field}.png",out.getvalue())
+        out=io.BytesIO(); im.save(out,format="PNG"); storage_upload(PRODUCT_BUCKET, f"{g.user_id}/{product_id}_{field}.png", out.getvalue())
     except Exception: app.logger.exception("Could not save product image"); return None
     return f"{product_id}_{field}.png"
 
@@ -3062,7 +3076,7 @@ def upload_product_image():
     elif field == "picture":
         db.execute("UPDATE products SET picture = ? WHERE id = ? AND uid = ?", filename, product_id, uid)
 
-    url = url_for("static", filename=f"uploads/products/{filename}")
+    url = url_for("media_product", product_id=product_id, field=field)
     return jsonify(success=True, url=url)
 
 
@@ -3088,7 +3102,7 @@ def delete_product_image():
         raise ValidationError("No image to remove.")
 
     try:
-        storage_delete(f"products/{uid}/{product_id}_{field}.png")
+        storage_delete(PRODUCT_BUCKET, f"{uid}/{product_id}_{field}.png")
     except RuntimeError:
         raise AppError("Could not remove the image. Please try again.", status_code=500)
 
@@ -5349,9 +5363,11 @@ def delete_transfer_info():
 @app.route("/uploads/logos/<filename>")
 @login_required
 def uploaded_logo(filename):
-    uid=g.user_id; account=db.execute("SELECT logo FROM profiles WHERE id = ?",uid)
-    if not account or account[0]["logo"] != filename: abort(403)
-    return storage_response(f"logos/{uid}.png","image/png")
+    uid = g.user_id
+    account = db.execute("SELECT logo FROM profiles WHERE id = ?", uid)
+    if not account or account[0]["logo"] != filename:
+        abort(403)
+    return storage_response(LOGO_BUCKET, f"{uid}.png", "image/png")
 
 @app.route("/help")
 def help_center():
@@ -5446,6 +5462,30 @@ def terms_of_use():
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e):
     return "CSRF validation failed.", 400
+
+
+@app.route("/media/logo")
+@login_required
+def media_logo():
+    rows = db.execute("SELECT logo FROM profiles WHERE id = ?", g.user_id)
+    if not rows or not rows[0]["logo"]:
+        abort(404)
+    return storage_response(LOGO_BUCKET, f"{g.user_id}.png")
+
+
+@app.route("/media/product/<product_id>/<field>")
+@login_required
+def media_product(product_id, field):
+    if field not in ALLOWED_PRODUCT_IMAGE_FIELDS:
+        abort(404)
+    column = {"barcode": "barcode", "qrcode": "qr_code", "picture": "picture"}[field]
+    rows = db.execute(
+        f"SELECT {column} AS filename FROM products WHERE id = ? AND uid = ?",
+        product_id, g.user_id,
+    )
+    if not rows or not rows[0]["filename"]:
+        abort(404)
+    return storage_response(PRODUCT_BUCKET, f"{g.user_id}/{product_id}_{field}.png")
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -453,7 +453,7 @@
           <div class="ob-logo-row">
             <label class="ob-logo-drop" id="obLogoDrop">
               {% if account.logo %}
-                <img id="obLogoPreview" alt="Company logo preview" src="{{ url_for('uploaded_logo', filename=account.logo) }}" style="display:block;">
+                <img id="obLogoPreview" alt="Company logo preview" src="{{ url_for('media_logo') }}" style="display:block;">
                 <span class="ob-logo-icon" id="obLogoIcon" style="display:none;">&#128247;</span>
               {% else %}
                 <img id="obLogoPreview" alt="Company logo preview">

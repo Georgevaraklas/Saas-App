@@ -338,7 +338,7 @@
       <div class="pd-field">
         <label for="pdUid">Account ID</label>
         <div class="pd-input-with-action">
-          <input type="text" id="pdUid" value="{{ account.uid if account else '' }}" disabled>
+          <input type="text" id="pdUid" value="{{ auth_user_id if auth_user_id else '' }}" disabled>
           <button type="button" class="pd-copy-btn" id="pdCopyUidBtn" title="Copy Account ID">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>

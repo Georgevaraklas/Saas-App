@@ -561,19 +561,21 @@ VALID_NOTIFY_WHEN = {
 }
 
 # Authorization Cookie Setup
-def set_auth_cookies(response, access_token, refresh_token, access_max_age=60 * 60):
-    response.set_cookie(
-        AUTH_ACCESS_COOKIE, access_token,
+def set_auth_cookies(response, access_token, refresh_token, access_max_age=60 * 60, remember=True):
+    access_cookie_kwargs = dict(
         httponly=True, secure=COOKIE_SECURE, samesite="Lax", path="/",
-        max_age=access_max_age,
+        max_age=access_max_age if remember else 60 * 30,            # 30 min unchecked
     )
-    response.set_cookie(
-        AUTH_REFRESH_COOKIE, refresh_token,
+    response.set_cookie(AUTH_ACCESS_COOKIE, access_token, **access_cookie_kwargs)
+
+    refresh_cookie_kwargs = dict(
         httponly=True, secure=COOKIE_SECURE, samesite="Lax", path="/",
-        max_age=60 * 60 * 24 * 30,
+        max_age=(60 * 60 * 24 * 30) if remember else (60 * 60 * 2),  # 2 hrs unchecked
     )
+    response.set_cookie(AUTH_REFRESH_COOKIE, refresh_token, **refresh_cookie_kwargs)
     return response
 
+    
 def refresh_auth_session(refresh_token):
 
     try:
@@ -2595,6 +2597,7 @@ def login():
 
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
+        remember = request.form.get("remember") == "on"
 
         if not email or not password:
             flash("Please fill in all fields.")
@@ -2620,7 +2623,7 @@ def login():
         session_data = auth_response.session
 
         response = redirect(url_for("index"))
-        return set_auth_cookies(response, session_data.access_token, session_data.refresh_token, session_data.expires_in)
+        return set_auth_cookies(response, session_data.access_token, session_data.refresh_token, session_data.expires_in, remember=remember,)
 
     return render_template("signin.html")
 
@@ -2649,6 +2652,11 @@ def personal_details():
         g.user_id,
     )
  
+    # NEW: the ID from the Supabase auth session itself, kept separate from
+    # whatever is stored in the profiles row so the frontend always shows
+    # the real authenticated user ID, not a possibly-stale copy of it.
+    auth_user_id = g.user_id
+ 
     if request.method == "POST":
         name = request.form.get("name")
         fullname = request.form.get("fullname")
@@ -2661,7 +2669,13 @@ def personal_details():
  
         if not name or not email:
             flash("Please fill in at least your account name and email.")
-            return render_template("personal_details.html", account=account, vat_numbers=vat_numbers, locations=locations)
+            return render_template(
+                "personal_details.html",
+                account=account,
+                vat_numbers=vat_numbers,
+                locations=locations,
+                auth_user_id=auth_user_id,
+            )
  
         logo_filename = account.get("logo")
  
@@ -2671,7 +2685,13 @@ def personal_details():
  
             if saved_filename is None:
                 flash("That logo couldn't be uploaded. Please try a different image (PNG/JPG/GIF/WEBP, under 5MB).")
-                return render_template("personal_details.html", account=account, vat_numbers=vat_numbers, locations=locations)
+                return render_template(
+                    "personal_details.html",
+                    account=account,
+                    vat_numbers=vat_numbers,
+                    locations=locations,
+                    auth_user_id=auth_user_id,
+                )
  
             logo_filename = saved_filename
  
@@ -2689,8 +2709,13 @@ def personal_details():
         flash("Your details have been updated.")
         return redirect("/settings/personal-details")
  
-    return render_template("personal_details.html", account=account, vat_numbers=vat_numbers, locations=locations)
- 
+    return render_template(
+        "personal_details.html",
+        account=account,
+        vat_numbers=vat_numbers,
+        locations=locations,
+        auth_user_id=auth_user_id,
+    )
  
 @app.route("/settings/personal-details/vat", methods=["POST"])
 @login_required
@@ -2931,6 +2956,139 @@ def auth_confirm():
     flash("Your email has been confirmed successfully.")
 
     return response
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+
+    if request.method == "POST":
+
+        email = request.form.get("email", "").strip().lower()
+
+        if not email:
+            flash("Please enter your email address.")
+            return render_template("forgot_password.html")
+
+        try:
+
+            supabase.auth.reset_password_for_email(
+                email,
+                {
+                    "redirect_to": f"{APP_URL}/auth/reset"
+                }
+            )
+
+        except Exception as e:
+            print("Supabase reset_password_for_email error:", e)
+            # Don't reveal whether the email exists — same message either way
+
+        flash(
+            "If an account exists with that email, "
+            "a password reset link has been sent."
+        )
+
+        return redirect(url_for("login"))
+
+    return render_template("forgot_password.html")
+
+
+@app.route("/auth/reset")
+def auth_reset():
+
+    token_hash = request.args.get("token_hash")
+    token_type = request.args.get("type", "recovery")
+
+    if not token_hash:
+        flash("Invalid or missing reset link.")
+        return redirect(url_for("login"))
+
+    try:
+
+        auth_response = supabase.auth.verify_otp({
+            "token_hash": token_hash,
+            "type": token_type
+        })
+
+    except Exception as e:
+
+        print("Supabase password reset verification error:", e)
+
+        flash(
+            "This reset link is invalid or has expired. "
+            "Please request a new one."
+        )
+
+        return redirect(url_for("forgot_password"))
+
+    session_data = auth_response.session
+    user = auth_response.user
+
+    if not session_data or not user:
+        flash("Password reset failed. Please try again.")
+        return redirect(url_for("forgot_password"))
+
+    # ---------------------------------
+    # Store a temporary authenticated session
+    # so /reset-password can call update_user
+    # ---------------------------------
+
+    response = redirect(url_for("reset_password"))
+
+    set_auth_cookies(
+        response,
+        session_data.access_token,
+        session_data.refresh_token,
+        session_data.expires_in
+    )
+
+    return response
+
+
+@app.route("/reset-password", methods=["GET", "POST"])
+def reset_password():
+
+    access_token = request.cookies.get(AUTH_ACCESS_COOKIE)
+    refresh_token = request.cookies.get(AUTH_REFRESH_COOKIE)
+
+    if not access_token or not refresh_token:
+        flash("Your reset session has expired. Please request a new link.")
+        return redirect(url_for("forgot_password"))
+
+    if request.method == "POST":
+
+        new_password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        if not new_password or len(new_password) < 8:
+            flash("Password must be at least 8 characters.")
+            return render_template("reset_password.html")
+
+        if new_password != confirm_password:
+            flash("Passwords do not match.")
+            return render_template("reset_password.html")
+
+        try:
+
+            supabase.auth.set_session(access_token, refresh_token)
+            supabase.auth.update_user({"password": new_password})
+
+        except Exception as e:
+
+            print("Supabase update_user error:", e)
+
+            flash("Unable to reset password. Please request a new link.")
+            return redirect(url_for("forgot_password"))
+
+        flash("Your password has been reset. Please log in.")
+
+        response = redirect(url_for("login"))
+        response.delete_cookie(AUTH_ACCESS_COOKIE)
+        response.delete_cookie(AUTH_REFRESH_COOKIE)
+
+        return response
+
+    return render_template("reset_password.html")
+
 
 @app.route("/onboarding", methods=["GET", "POST"])
 @login_required

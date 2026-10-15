@@ -23,7 +23,29 @@
       <h2 class="page-title">Welcome Back</h2>
       <p class="page-sub">Sign in to your account to continue.</p>
 
-      <div class="error-msg" id="loginError">Invalid email or password.</div>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-container" id="flashContainer">
+            {% for category, message in messages %}
+              <div class="flash-toast {{ category }}">
+                <span class="flash-icon">
+                  {% if category == 'success' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {% elif category == 'error' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {% elif category == 'warning' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+                  {% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="11"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  {% endif %}
+                </span>
+                <span class="flash-text">{{ message }}</span>
+                <button type="button" class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
 
       <form id="loginForm" class="active" action="/login" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -47,8 +69,8 @@
         </div>
 
         <div class="remember-row">
-          <label><input type="checkbox"> Remember me</label>
-          <a href="#">Forgot your password?</a>
+          <label><input type="checkbox" name="remember" checked> Remember me</label>
+          <a href="/forgot-password">Forgot your password?</a>
         </div>
 
         <button type="submit" class="submit-btn">Login</button>
@@ -86,6 +108,14 @@ function togglePassword(fieldId, btn){
     btn.innerHTML = eyeOpenSVG;
   }
 }
+
+// ---- Flash toast auto-dismiss ----
+document.querySelectorAll('.flash-toast').forEach(function(toast, i) {
+  setTimeout(function() {
+    toast.classList.add('hide');
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 4500 + i * 400);
+});
 </script>
 
 </body>

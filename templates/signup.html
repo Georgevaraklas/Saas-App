@@ -2,9 +2,72 @@
 <html lang="el">
 <head>
 <meta charset="UTF-8">
-<title>ΤΕΦΤΕΡΙ | Sign In</title>
+<title>ΤΕΦΤΕΡΙ | Sign Up</title>
 <link href="/static/styless.css" rel="stylesheet">
-
+<style>
+  .pw-rules {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    font-size: 0.8rem;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.6s ease, opacity 0.45s ease, margin-top 0.6s ease;
+  }
+  .pw-rules.show {
+    max-height: 200px;
+    opacity: 1;
+    margin-top: 8px;
+  }
+  .pw-rules li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #999;
+    line-height: 1.9;
+  }
+  .pw-rules li .icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1.5px solid #ccc;
+    transition: background-color 0.3s ease, border-color 0.3s ease, transform 0.3s ease;
+  }
+  .pw-rules li .icon svg {
+    width: 10px;
+    height: 10px;
+    opacity: 0;
+    transform: scale(0.5);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  .pw-rules li.valid {
+    color: #2a9d4a;
+  }
+  .pw-rules li.valid .icon {
+    background-color: #2a9d4a;
+    border-color: #2a9d4a;
+    transform: scale(1.05);
+  }
+  .pw-rules li.valid .icon svg {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .match-msg {
+    font-size: 0.8rem;
+    margin-top: 6px;
+  }
+  .match-msg.ok {
+    color: #2a9d4a;
+  }
+  .match-msg.bad {
+    color: #d33;
+  }
+</style>
 </head>
 <body>
 
@@ -23,17 +86,32 @@
       <h2 class="page-title">Welcome</h2>
       <p class="page-sub">Create an account to continue.</p>
 
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          <div class="flash-container" id="flashContainer">
+            {% for category, message in messages %}
+              <div class="flash-toast {{ category }}">
+                <span class="flash-icon">
+                  {% if category == 'success' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {% elif category == 'error' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  {% elif category == 'warning' %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+                  {% else %}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><line x1="12" y1="16" x2="12" y2="11"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                  {% endif %}
+                </span>
+                <span class="flash-text">{{ message }}</span>
+                <button type="button" class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endwith %}
+
       <form id="loginForm" class="active" action="/signup" method="POST" enctype="multipart/form-data">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-
-        <div class="field">
-          <label>Company Logo (optional)</label>
-          <div class="logo-upload-wrap" id="logoUploadWrap">
-            <img id="logoPreviewImg" class="logo-preview-img" alt="" style="display:none;">
-            <span id="logoUploadHint" class="logo-upload-hint">Upload<br>Logo</span>
-            <input type="file" id="logoInput" name="logo" accept="image/png, image/jpeg, image/webp, image/svg+xml">
-          </div>
-        </div>
 
         <div class="field">
           <label for="loginUser">Email</label>
@@ -79,9 +157,28 @@
             <circle cx="12" cy="12" r="3"/>
             </svg></button>
           </div>
+          <ul id="pwRules" class="pw-rules">
+            <li id="rule-length"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>At least 8 characters</li>
+            <li id="rule-upper"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>An uppercase letter (A-Z)</li>
+            <li id="rule-lower"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>A lowercase letter (a-z)</li>
+            <li id="rule-number"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>A number (0-9)</li>
+            <li id="rule-symbol"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>A symbol (e.g. !@#$%)</li>
+          </ul>
         </div>
 
-        <button type="submit" class="submit-btn">Sign Up</button>
+        <div class="field">
+          <label for="confirmPassword">Confirm Password</label>
+          <div class="input-wrap">
+            <input type="password" id="confirmPassword" placeholder="••••••••" name="confirm_password" required>
+            <button type="button" class="toggle-pass" onclick="togglePassword('confirmPassword', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
+            <circle cx="12" cy="12" r="3"/>
+            </svg></button>
+          </div>
+          <div id="matchMsg" class="match-msg"></div>
+        </div>
+
+        <button type="submit" class="submit-btn" id="submitBtn">Sign Up</button>
       </form>
 
       <p class="switch-text">Already have an account? <button id="siBtn">Sign in here</button></p>
@@ -117,6 +214,71 @@ function togglePassword(fieldId, btn){
   }
 }
 
+// ---- Password confirmation + strength validation ----
+const pwField = document.getElementById('password');
+const confirmField = document.getElementById('confirmPassword');
+const matchMsg = document.getElementById('matchMsg');
+const submitBtn = document.getElementById('submitBtn');
+const loginForm = document.getElementById('loginForm');
+
+const rules = {
+  length: { el: document.getElementById('rule-length'), test: v => v.length >= 8 },
+  upper:  { el: document.getElementById('rule-upper'),  test: v => /[A-Z]/.test(v) },
+  lower:  { el: document.getElementById('rule-lower'),  test: v => /[a-z]/.test(v) },
+  number: { el: document.getElementById('rule-number'), test: v => /[0-9]/.test(v) },
+  symbol: { el: document.getElementById('rule-symbol'), test: v => /[^A-Za-z0-9]/.test(v) }
+};
+
+function validateAll() {
+  const pw = pwField.value;
+  const confirm = confirmField.value;
+
+  let allRulesPass = true;
+  for (const key in rules) {
+    const passes = rules[key].test(pw);
+    rules[key].el.classList.toggle('valid', passes);
+    if (!passes) allRulesPass = false;
+  }
+
+  let matchOk = false;
+  if (confirm.length === 0) {
+    matchMsg.textContent = '';
+    matchMsg.className = 'match-msg';
+  } else if (pw === confirm) {
+    matchMsg.textContent = 'Passwords match';
+    matchMsg.className = 'match-msg ok';
+    matchOk = true;
+  } else {
+    matchMsg.textContent = 'Passwords do not match';
+    matchMsg.className = 'match-msg bad';
+  }
+
+  submitBtn.disabled = !(allRulesPass && matchOk);
+  return allRulesPass && matchOk;
+}
+
+const pwRules = document.getElementById('pwRules');
+
+pwField.addEventListener('focus', function() {
+  pwRules.classList.add('show');
+});
+
+pwField.addEventListener('blur', function() {
+  pwRules.classList.remove('show');
+});
+
+pwField.addEventListener('input', validateAll);
+confirmField.addEventListener('input', validateAll);
+
+loginForm.addEventListener('submit', function(e) {
+  if (!validateAll()) {
+    e.preventDefault();
+  }
+});
+
+// Initialize disabled state on load
+submitBtn.disabled = true;
+
 // ---- Logo upload preview ----
 const logoUploadWrap = document.getElementById('logoUploadWrap');
 const logoInput = document.getElementById('logoInput');
@@ -138,6 +300,14 @@ logoInput.addEventListener('change', function() {
     logoUploadHint.style.display = 'none';
   };
   reader.readAsDataURL(file);
+});
+
+// ---- Flash toast auto-dismiss ----
+document.querySelectorAll('.flash-toast').forEach(function(toast, i) {
+  setTimeout(function() {
+    toast.classList.add('hide');
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 4500 + i * 400);
 });
 
 </script>

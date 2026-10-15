@@ -313,3 +313,89 @@
   text-align:center;
   line-height:1.3;
 }
+
+
+/* ---------- FLASH TOASTS ---------- */
+.flash-container{
+  position:fixed;
+  top:20px;
+  right:20px;
+  z-index:9999;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  max-width:380px;
+}
+
+.flash-toast{
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  padding:14px 16px;
+  border-radius:8px;
+  background:#fff;
+  box-shadow:0 10px 30px rgba(30,50,100,0.12);
+  border-left:4px solid var(--sidebar-blue);
+  font-family:inherit;
+  font-size:13.5px;
+  line-height:1.5;
+  animation:flashIn .35s ease forwards;
+}
+.flash-toast.hide{
+  animation:flashOut .3s ease forwards;
+}
+
+@keyframes flashIn{
+  from{ opacity:0; transform:translateX(40px); }
+  to{ opacity:1; transform:translateX(0); }
+}
+@keyframes flashOut{
+  from{ opacity:1; transform:translateX(0); }
+  to{ opacity:0; transform:translateX(40px); }
+}
+
+.flash-icon{
+  flex-shrink:0;
+  width:19px;
+  height:19px;
+  margin-top:1px;
+}
+
+.flash-text{
+  flex:1;
+  color:#3a4257;
+}
+
+.flash-close{
+  flex-shrink:0;
+  background:none;
+  border:none;
+  cursor:pointer;
+  color:var(--text-muted);
+  opacity:.6;
+  padding:0;
+  line-height:1;
+  font-size:1.1rem;
+  transition:opacity .15s ease;
+}
+.flash-close:hover{ opacity:1; }
+
+/* categories, reusing your existing palette where it fits */
+.flash-toast.success{ border-left-color:#2a9d4a; }
+.flash-toast.success .flash-icon{ color:#2a9d4a; }
+
+.flash-toast.error{ border-left-color:#c0392b; background:#fdecea; }
+.flash-toast.error .flash-icon{ color:#c0392b; }
+.flash-toast.error .flash-text{ color:#c0392b; }
+
+.flash-toast.warning{ border-left-color:var(--accent-orange); }
+.flash-toast.warning .flash-icon{ color:var(--accent-orange); }
+
+.flash-toast.info,
+.flash-toast.message{ border-left-color:var(--sidebar-blue); }
+.flash-toast.info .flash-icon,
+.flash-toast.message .flash-icon{ color:var(--sidebar-blue); }
+
+@media (max-width:480px){
+  .flash-container{ left:16px; right:16px; max-width:none; top:12px; }
+}

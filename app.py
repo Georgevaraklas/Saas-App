@@ -1571,6 +1571,17 @@ if RATELIMIT_STORAGE_URI=="memory://" and not app.debug:
 limiter=Limiter(key_func=get_user_id,app=app,storage_uri=RATELIMIT_STORAGE_URI)
 
 
+
+def fmt_date(d):
+    """Normalize a DB date value to a plain 'YYYY-MM-DD' string."""
+    if d is None:
+        return None
+    if hasattr(d, "strftime"):          # datetime.date / datetime.datetime object
+        return d.strftime("%Y-%m-%d")
+    if isinstance(d, str):
+        return d.split(" ")[0] if " " in d else d[:10]  # trims any time part
+    return str(d)
+
 """Filters"""
 
 # Custom filter
@@ -1999,8 +2010,8 @@ def add_productstock():
         flash("Product and quantity are required!", "error")
         return redirect("/stock")
 
-    rdate = parse_date_to_int(production_date)
-    edate = parse_date_to_int(expiration_date)
+    rdate = production_date
+    edate = expiration_date
 
     product = db.execute("SELECT pid FROM products WHERE id = ? AND uid = ?",
                           product_id, user_id)
@@ -2443,8 +2454,8 @@ def invoices():
             "vat_total": vat_total,
             "total": total,
             "status": "Paid" if inv["pstatus"] == "paid" else "Pending",
-            "date": inv["rdate"],
-            "issue_date": inv["edate"],
+            "date": fmt_date(inv["rdate"]),
+            "issue_date": fmt_date(inv["edate"]),
             "products": products,
             "transfer_infos": transfer_infos,
         })

@@ -865,16 +865,26 @@
     /* --- Click-to-edit fields inside the Scan Confirmation modal --- */
     .scan-confirm-meta .scan-field {
       cursor: pointer;
-      border-radius: 4px;
-      padding: 4px 6px;
-      margin: -4px -6px;
-      transition: background 0.15s ease;
     }
-    .scan-confirm-meta .scan-field:hover {
-      background: #f0f0ff;
+    .scan-confirm-meta .scan-field .label {
+      margin-bottom: 4px;
+    }
+    .scan-confirm-meta .scan-field-box {
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: #eef0f6;
+      border: 1px solid #dde1ec;
+      transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .scan-confirm-meta .scan-field:hover .scan-field-box {
+      background: #e6e9f7;
+      border-color: #c9cfe8;
+    }
+    .scan-confirm-meta .scan-field.editing .scan-field-box {
+      background: #fff;
+      border-color: #0b1215;
     }
     .scan-confirm-meta .scan-field.editing {
-      background: #fff;
       cursor: default;
     }
     .scan-confirm-meta .value-display {
@@ -1022,7 +1032,6 @@
     <table>
       <thead>
         <tr>
-          <th>Date</th>
           <th>Invoice No.</th>
           <th>Accounting Document</th>
           <th>Contact</th>
@@ -1039,7 +1048,6 @@
         {% if invoices %}
           {% for invoice in invoices %}
             <tr class="inv-row" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}" data-date="{{ invoice['date'] }}" data-customer="{{ invoice['customer_name'] }}" data-total="{{ invoice['total'] if invoice['total'] is defined else 0 }}" data-issue-date="{{ invoice['issue_date'] }}">
-              <td class="editable-cell" data-field="date" data-invoice-id="{{ invoice['id'] if invoice['id'] is defined else loop.index0 }}">{{ invoice["date"] }}</td>
               <td>{{ invoice["invoice_number"] }}</td>
               <td>{{ invoice["doc_number"] }}</td>
               <td class="product-name">{{ invoice["customer_name"] }}</td>
@@ -1094,7 +1102,7 @@
           {% endfor %}
         {% else %}
           <tr class="no-products-row">
-            <td colspan="11">No invoices available.</td>   <!-- colspan updated to 11 -->
+            <td colspan="10">No invoices available.</td>   <!-- colspan updated to 10 -->
           </tr>
         {% endif %}
       </tbody>
@@ -1495,40 +1503,52 @@
       <div class="scan-confirm-meta" id="scan-confirm-meta">
         <div class="scan-field" data-type="select">
           <span class="label">Document Type</span>
-          <span class="value-display" id="scan-doc-type-display"></span>
-          <select id="scan-doc-type" class="value-input" style="display:none;">
-            <option value="sales_invoice">Sales Invoice</option>
-            <option value="sales_invoice_ics">Sales Invoice &amp; Intra Community Supply</option>
-            <option value="service_invoice">Service Invoice</option>
-          </select>
+          <div class="scan-field-box">
+            <span class="value-display" id="scan-doc-type-display"></span>
+            <select id="scan-doc-type" class="value-input" style="display:none;">
+              <option value="sales_invoice" selected>Sales Invoice</option>
+              <option value="sales_invoice_ics">Sales Invoice &amp; Intra Community Supply</option>
+              <option value="service_invoice">Service Invoice</option>
+            </select>
+          </div>
         </div>
         <div class="scan-field" data-type="date">
           <span class="label">Date</span>
-          <span class="value-display" id="scan-date-display"></span>
-          <input type="date" id="scan-date" class="value-input" style="display:none;">
+          <div class="scan-field-box">
+            <span class="value-display" id="scan-date-display"></span>
+            <input type="date" id="scan-date" class="value-input" style="display:none;">
+          </div>
         </div>
         <div class="scan-field" data-type="date">
           <span class="label">Issue Date</span>
-          <span class="value-display" id="scan-issue-date-display"></span>
-          <input type="date" id="scan-issue-date" class="value-input" style="display:none;">
+          <div class="scan-field-box">
+            <span class="value-display" id="scan-issue-date-display"></span>
+            <input type="date" id="scan-issue-date" class="value-input" style="display:none;">
+          </div>
         </div>
         <div class="scan-field" data-type="text">
           <span class="label">Customer</span>
-          <span class="value-display" id="scan-customer-display"></span>
-          <input type="text" id="scan-customer" class="value-input" style="display:none;">
+          <div class="scan-field-box">
+            <span class="value-display" id="scan-customer-display"></span>
+            <input type="text" id="scan-customer" class="value-input" style="display:none;">
+          </div>
         </div>
         <div class="scan-field" data-type="text">
           <span class="label">Customer VAT</span>
-          <span class="value-display" id="scan-customer-vat-display"></span>
-          <input type="text" id="scan-customer-vat" class="value-input" style="display:none;">
+          <div class="scan-field-box">
+            <span class="value-display" id="scan-customer-vat-display"></span>
+            <input type="text" id="scan-customer-vat" class="value-input" style="display:none;">
+          </div>
         </div>
         <div class="scan-field" data-type="select">
           <span class="label">Status</span>
-          <span class="value-display" id="scan-status-display"></span>
-          <select id="scan-status" class="value-input" style="display:none;">
+          <div class="scan-field-box">
+            <span class="value-display" id="scan-status-display"></span>
+            <select id="scan-status" class="value-input" style="display:none;">
             <option value="Pending">Pending</option>
             <option value="Paid">Paid</option>
-          </select>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -3413,7 +3433,13 @@ function getCsrfToken() {
     const inv = currentScannedData;
 
     // Populate meta fields
-    document.getElementById('scan-doc-type').value = inv.document_type || 'sales_invoice';
+    const docTypeSelect = document.getElementById('scan-doc-type');
+    const rawDocType = (inv.document_type || '').toString();
+    const docTypeMatches = Array.from(docTypeSelect.options).some(opt => opt.value === rawDocType);
+    // Same safety net as the status field: if OCR didn't return a document_type,
+    // or returned something that isn't one of our known options, fall back to
+    // "Sales Invoice" rather than leaving the select in an undefined state.
+    docTypeSelect.value = docTypeMatches ? rawDocType : 'sales_invoice';
     document.getElementById('scan-date').value = inv.date || '';
     document.getElementById('scan-issue-date').value = inv.issue_date || inv.date || '';
     document.getElementById('scan-customer').value = inv.customer_name || '';

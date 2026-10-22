@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="/static/favicon.ico" rel="icon">
     <link href="/static/styles.css" rel="stylesheet">
+    <script>
+      // Shared HTML escaper for any client-side innerHTML / template-literal
+      // rendering of user-supplied data (names, notes, addresses, OCR text...).
+      // Escapes quotes as well, so it is safe in text AND quoted attributes.
+      function escHtml(value) {
+        return (value === null || value === undefined ? '' : String(value))
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      }
+    </script>
     {% block styles %}{% endblock %}
     <style>
       /* =======================================================

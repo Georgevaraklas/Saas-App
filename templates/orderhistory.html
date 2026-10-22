@@ -882,14 +882,14 @@ function getCsrfToken() {
     if (!order) return;
 
     orderDetailsMeta.innerHTML = `
-      <div><span class="label">Order ID</span><span class="value">${order.oid}</span></div>
-      <div><span class="label">Client Name</span><span class="value">${order.customer_name || ''}</span></div>
-      <div><span class="label">VAT Number</span><span class="value">${order.cafm || ''}</span></div>
-      <div><span class="label">Order Type</span><span class="value">${order.order_type || ''}</span></div>
+      <div><span class="label">Order ID</span><span class="value">${escHtml(order.oid)}</span></div>
+      <div><span class="label">Client Name</span><span class="value">${escHtml(order.customer_name || '')}</span></div>
+      <div><span class="label">VAT Number</span><span class="value">${escHtml(order.cafm || '')}</span></div>
+      <div><span class="label">Order Type</span><span class="value">${escHtml(order.order_type || '')}</span></div>
       <div><span class="label">Invoice Type</span><span class="value">${(order.receive == 1 || order.receive == '1') ? 'Purchase Invoice' : 'Sales Invoice'}</span></div>
-      <div><span class="label">Payment Status</span><span class="value">${order.pstatus || ''}</span></div>
-      <div><span class="label">Issue Date</span><span class="value">${order.rdate || ''}</span></div>
-      <div><span class="label">Due Date</span><span class="value">${order.edate || ''}</span></div>
+      <div><span class="label">Payment Status</span><span class="value">${escHtml(order.pstatus || '')}</span></div>
+      <div><span class="label">Issue Date</span><span class="value">${escHtml(order.rdate || '')}</span></div>
+      <div><span class="label">Due Date</span><span class="value">${escHtml(order.edate || '')}</span></div>
     `;
 
     const products = order.products || [];
@@ -909,10 +909,10 @@ function getCsrfToken() {
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td class="product-name">${p.name || ''}</td>
-          <td class="product-sku">${p.sku || '-'}</td>
+          <td class="product-name">${escHtml(p.name || '')}</td>
+          <td class="product-sku">${escHtml(p.sku || '-')}</td>
           <td>${formatMoney(price)}</td>
-          <td>${p.lot || ''}</td>
+          <td>${escHtml(p.lot || '')}</td>
           <td class="quantity-cell">${quantity} Item</td>
           <td class="subtotal-cell">${formatMoney(subtotal)}</td>
         `;
@@ -943,7 +943,8 @@ function getCsrfToken() {
   function displayValue(value) {
     if (value === null || value === undefined) return '-';
     const str = String(value).trim();
-    return str === '' ? '-' : str;
+    // Result is only ever interpolated into innerHTML templates, so escape here.
+    return str === '' ? '-' : escHtml(str);
   }
 
   // Renders one block per saved transfer entry into the view modal, each
@@ -1184,7 +1185,7 @@ function getCsrfToken() {
         if (triggerBtn) {
           const cell = triggerBtn.closest('td');
           if (cell) {
-            cell.innerHTML = `<button type="button" class="view-info-btn" data-order-id="${orderId}">View Info</button>`;
+            cell.innerHTML = `<button type="button" class="view-info-btn" data-order-id="${escHtml(orderId)}">View Info</button>`;
           }
         }
 

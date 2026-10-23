@@ -1477,7 +1477,7 @@ function getCsrfToken() {
     recipes.forEach((recipe, recipeIdx) => {
       const section = document.createElement('div');
       section.className = 'trace-recipe-section';
-      section.innerHTML = `<h3 style="font-size:15px;margin:16px 0 8px;">${recipe.recipe_name} — ${recipe.runs} run(s)</h3>`;
+      section.innerHTML = `<h3 style="font-size:15px;margin:16px 0 8px;">${escHtml(recipe.recipe_name)} — ${escHtml(recipe.runs)} run(s)</h3>`;
 
       recipe.ingredients.forEach(ing => {
         const block = document.createElement('div');
@@ -1486,8 +1486,8 @@ function getCsrfToken() {
 
         block.innerHTML = `
           <div class="trace-ingredient-header">
-            <strong>${ing.name}</strong>
-            <span class="trace-ingredient-progress" data-recipe-idx="${recipeIdx}" data-pid="${ing.pid}">0 / ${ing.needed} selected</span>
+            <strong>${escHtml(ing.name)}</strong>
+            <span class="trace-ingredient-progress" data-recipe-idx="${escHtml(recipeIdx)}" data-pid="${escHtml(ing.pid)}">0 / ${escHtml(ing.needed)} selected</span>
           </div>
         `;
 
@@ -1510,12 +1510,12 @@ function getCsrfToken() {
             tr.dataset.stockId = b.stock_id;
             tr.innerHTML = `
               <td><input type="checkbox" class="trace-batch-check"></td>
-              <td>${b.location || '-'}</td>
-              <td>${b.lot || '-'}</td>
-              <td>${b.production_date || '-'}</td>
-              <td>${b.expiration_date || '-'}</td>
-              <td>${b.quantity}${uomSuffix}</td>
-              <td><input type="number" class="trace-batch-qty" min="0" max="${b.quantity}" step="any" value="0" disabled></td>
+              <td>${escHtml(b.location || '-')}</td>
+              <td>${escHtml(b.lot || '-')}</td>
+              <td>${escHtml(b.production_date || '-')}</td>
+              <td>${escHtml(b.expiration_date || '-')}</td>
+              <td>${escHtml(b.quantity)}${escHtml(uomSuffix)}</td>
+              <td><input type="number" class="trace-batch-qty" min="0" max="${escHtml(b.quantity)}" step="any" value="0" disabled></td>
             `;
             const checkbox = tr.querySelector('.trace-batch-check');
             const qtyInput = tr.querySelector('.trace-batch-qty');
@@ -1780,11 +1780,11 @@ function getCsrfToken() {
           const oidDisplay = item.oid || '-';
           const stockId = item.stock_id || '';
           tr.innerHTML = `
-            <td>${fieldValue}</td>
-            <td>${item.quantity || '-'}</td>
-            <td>${oidDisplay}</td>
+            <td>${escHtml(fieldValue)}</td>
+            <td>${escHtml(item.quantity || '-')}</td>
+            <td>${escHtml(oidDisplay)}</td>
             <td>
-              <button class="delete-stock-btn" data-stock-id="${stockId}" title="Delete this item">🗑️</button>
+              <button class="delete-stock-btn" data-stock-id="${escHtml(stockId)}" title="Delete this item">🗑️</button>
             </td>
           `;
           fieldTableBody.appendChild(tr);
@@ -1833,11 +1833,11 @@ function getCsrfToken() {
             const oidDisplay = item.oid || '-';
             const stockId = item.stock_id || '';
             tr.innerHTML = `
-              <td>${fieldValue}</td>
-              <td>${item.quantity || '-'}</td>
-              <td>${oidDisplay}</td>
+              <td>${escHtml(fieldValue)}</td>
+              <td>${escHtml(item.quantity || '-')}</td>
+              <td>${escHtml(oidDisplay)}</td>
               <td>
-                <button class="delete-stock-btn" data-stock-id="${stockId}" title="Delete this item">🗑️</button>
+                <button class="delete-stock-btn" data-stock-id="${escHtml(stockId)}" title="Delete this item">🗑️</button>
               </td>
             `;
             fieldTableBody.appendChild(tr);
@@ -1873,11 +1873,11 @@ function getCsrfToken() {
             const oidDisplay = item.oid || '-';
             const stockId = item.stock_id || '';
             tr.innerHTML = `
-              <td>${fieldValue}</td>
-              <td>${item.quantity || '-'}</td>
-              <td>${oidDisplay}</td>
+              <td>${escHtml(fieldValue)}</td>
+              <td>${escHtml(item.quantity || '-')}</td>
+              <td>${escHtml(oidDisplay)}</td>
               <td>
-                <button class="delete-stock-btn" data-stock-id="${stockId}" title="Delete this item">🗑️</button>
+                <button class="delete-stock-btn" data-stock-id="${escHtml(stockId)}" title="Delete this item">🗑️</button>
               </td>
             `;
             fieldTableBody.appendChild(tr);
@@ -1989,13 +1989,13 @@ function getCsrfToken() {
           tr.className = 'sync-order-row';
           tr.dataset.stockId = item.id;
           tr.innerHTML = `
-            <td>${item.quantity}</td>
-            <td>${item.location || '-'}</td>
-            <td>${item.production_date || '-'}</td>
-            <td>${item.expiration_date || '-'}</td>
-            <td>${item.invoice_number || '-'}</td>
-            <td>${item.lot || '-'}</td>
-            <td>${item.oid || '-'}</td>
+            <td>${escHtml(item.quantity)}</td>
+            <td>${escHtml(item.location || '-')}</td>
+            <td>${escHtml(item.production_date || '-')}</td>
+            <td>${escHtml(item.expiration_date || '-')}</td>
+            <td>${escHtml(item.invoice_number || '-')}</td>
+            <td>${escHtml(item.lot || '-')}</td>
+            <td>${escHtml(item.oid || '-')}</td>
           `;
           editOrdersBody.appendChild(tr);
         });

@@ -2094,8 +2094,8 @@ function getCsrfToken() {
     tr.setAttribute('data-sku', sku || '');
 
     tr.innerHTML = `
-      <td class="product-name">${name}</td>
-      <td class="product-sku">${sku || '-'}</td>
+      <td class="product-name">${escHtml(name)}</td>
+      <td class="product-sku">${escHtml(sku || '-')}</td>
       <td>${formatMoney(price)}</td>
       <td>
         <div class="lot-cell">
@@ -2277,7 +2277,8 @@ function getCsrfToken() {
   function displayValue(value) {
     if (value === null || value === undefined) return '-';
     const str = String(value).trim();
-    return str === '' ? '-' : str;
+    // Result is only ever interpolated into innerHTML templates, so escape here.
+    return str === '' ? '-' : escHtml(str);
   }
 
   // ---- Invoice Details view modal (read-only, everything except transfer info) ----
@@ -2577,7 +2578,7 @@ function getCsrfToken() {
         if (triggerBtn) {
           const cell = triggerBtn.closest('td');
           if (cell) {
-            cell.innerHTML = `<button type="button" class="view-info-btn" data-oid="${oid}">View Info</button>`;
+            cell.innerHTML = `<button type="button" class="view-info-btn" data-oid="${escHtml(oid)}">View Info</button>`;
           }
         }
 
@@ -2615,7 +2616,7 @@ function getCsrfToken() {
   function invRenderCellValue(cell, field, value) {
     if (field === 'status') {
       const isPaid = value === 'Paid';
-      cell.innerHTML = `<span class="status-pill ${isPaid ? 'paid' : 'pending'}">${value}</span>`;
+      cell.innerHTML = `<span class="status-pill ${isPaid ? 'paid' : 'pending'}">${escHtml(value)}</span>`;
     } else {
       cell.textContent = value;
     }

@@ -924,7 +924,7 @@ function getCsrfToken() {
 
     function populateSortOptions(sortGroup) {
       const options = SORT_OPTIONS[sortGroup] || SORT_OPTIONS.contacts;
-      sortBySelect.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+      sortBySelect.innerHTML = options.map(o => `<option value="${escHtml(o.value)}">${escHtml(o.label)}</option>`).join('');
     }
 
     function setOrder(order) {
@@ -1010,9 +1010,9 @@ function getCsrfToken() {
       viewerTitle.textContent = activeCard.dataset.title;
       viewerDesc.textContent = activeCard.dataset.desc;
       viewerMeta.innerHTML = `
-        <span class="meta-item">Sorted by <strong>${sortLabel}</strong> (${orderLabel})</span>
-        <span class="meta-item">Period: <strong>${fromLabel()}</strong> &rarr; <strong>${toLabel()}</strong></span>
-        <span class="meta-item">Output: <strong>${formatLabel}</strong></span>
+        <span class="meta-item">Sorted by <strong>${escHtml(sortLabel)}</strong> (${escHtml(orderLabel)})</span>
+        <span class="meta-item">Period: <strong>${escHtml(fromLabel())}</strong> &rarr; <strong>${escHtml(toLabel())}</strong></span>
+        <span class="meta-item">Output: <strong>${escHtml(formatLabel)}</strong></span>
       `;
 
       viewerBody.innerHTML = `
@@ -1071,7 +1071,7 @@ function getCsrfToken() {
           viewerBody.innerHTML = `
             <div class="rpt-viewer-placeholder">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
-              <p>${err.message || 'Something went wrong generating this report.'}</p>
+              <p>${escHtml(err.message || 'Something went wrong generating this report.')}</p>
             </div>
           `;
         });
@@ -1080,7 +1080,7 @@ function getCsrfToken() {
     // Renders a dynamic table from whatever columns/rows the backend returns
     // for the current report type -- no hardcoded column set.
     function renderReportTable(columns, rows) {
-      const theadRow = columns.map(c => `<th>${c}</th>`).join('');
+      const theadRow = columns.map(c => `<th>${escHtml(c)}</th>`).join('');
 
       if (!rows || rows.length === 0) {
         viewerBody.innerHTML = `
@@ -1102,7 +1102,7 @@ function getCsrfToken() {
         // Rows now come back as plain arrays in the same order as `columns`
         // (not objects -- Flask's jsonify() alphabetically sorts dict keys,
         // which used to scramble column alignment; arrays are never reordered).
-        const cells = row.map((val, i) => `<td>${formatCellValue(columns[i], val)}</td>`).join('');
+        const cells = row.map((val, i) => `<td>${escHtml(formatCellValue(columns[i], val))}</td>`).join('');
         return `<tr>${cells}</tr>`;
       }).join('');
 

@@ -1,4 +1,5 @@
 import os
+import re
 
 # Vercel serverless filesystem configuration
 os.environ["TMPDIR"] = "/tmp"
@@ -1305,10 +1306,26 @@ def rows_to_table(columns, rows, currency_code="USD"):
     return table
  
  
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+# Plain numbers, optionally with thousands separators and a short currency
+# suffix (e.g. "-12.00 EUR", "1,234.50 $"): safe to leave as they are.
+_NUMBER_LIKE = re.compile(r"^[+-]?\d[\d,]*(\.\d+)?(\s\S{1,4})?$")
+
+
+def csv_safe(value):
+    """Stop spreadsheet apps from running a user-supplied text cell as a
+    formula (CSV/formula injection): prefix risky strings with a single quote."""
+    if (isinstance(value, str) and len(value) > 1 and value.startswith(_FORMULA_PREFIXES)
+            and not _NUMBER_LIKE.match(value)):
+        return "'" + value
+    return value
+
+
 def build_csv(title, columns, rows, currency_code="USD"):
     table = rows_to_table(columns, rows, currency_code)
     if not table:
         table = [["No data returned for this period."] + [""] * (len(columns) - 1)]
+    table = [[csv_safe(v) for v in row] for row in table]
  
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -1349,6 +1366,11 @@ def build_excel(title, columns, rows, currency_code="USD"):
  
     for row in table:
         ws.append(row)
+        # openpyxl turns any string starting with "=" into a live formula;
+        # keep user-supplied text as plain text instead.
+        for cell in ws[ws.max_row]:
+            if cell.data_type == "f":
+                cell.data_type = "s"
  
     for i, col in enumerate(columns, start=1):
         col_values = [str(r[i - 1]) for r in table]

@@ -1672,9 +1672,9 @@ function getCsrfToken() {
       const tr = document.createElement('tr');
       const uomSuffix = item.uom ? ` ${item.uom}` : '';
       tr.innerHTML = `
-        <td>${item.name}</td>
-        <td>${item.needed}${uomSuffix}</td>
-        <td>${item.available}${uomSuffix}</td>
+        <td>${escHtml(item.name)}</td>
+        <td>${escHtml(item.needed)}${escHtml(uomSuffix)}</td>
+        <td>${escHtml(item.available)}${escHtml(uomSuffix)}</td>
       `;
       shortageTableBody.appendChild(tr);
     });
@@ -1777,8 +1777,8 @@ function getCsrfToken() {
 
       block.innerHTML = `
         <div class="trace-ingredient-header">
-          <strong>${ing.name}</strong>
-          <span class="trace-ingredient-progress" data-pid="${ing.pid}">0 / ${ing.needed} selected</span>
+          <strong>${escHtml(ing.name)}</strong>
+          <span class="trace-ingredient-progress" data-pid="${escHtml(ing.pid)}">0 / ${escHtml(ing.needed)} selected</span>
         </div>
       `;
 
@@ -1800,12 +1800,12 @@ function getCsrfToken() {
           tr.dataset.stockId = b.stock_id;
           tr.innerHTML = `
             <td><input type="checkbox" class="trace-batch-check"></td>
-            <td>${b.location || '-'}</td>
-            <td>${b.lot || '-'}</td>
-            <td>${b.production_date || '-'}</td>
-            <td>${b.expiration_date || '-'}</td>
-            <td>${b.quantity}${uomSuffix}</td>
-            <td><input type="number" class="trace-batch-qty" min="0" max="${b.quantity}" step="any" value="0" disabled></td>
+            <td>${escHtml(b.location || '-')}</td>
+            <td>${escHtml(b.lot || '-')}</td>
+            <td>${escHtml(b.production_date || '-')}</td>
+            <td>${escHtml(b.expiration_date || '-')}</td>
+            <td>${escHtml(b.quantity)}${escHtml(uomSuffix)}</td>
+            <td><input type="number" class="trace-batch-qty" min="0" max="${escHtml(b.quantity)}" step="any" value="0" disabled></td>
           `;
           const checkbox = tr.querySelector('.trace-batch-check');
           const qtyInput = tr.querySelector('.trace-batch-qty');

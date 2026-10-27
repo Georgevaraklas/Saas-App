@@ -620,7 +620,7 @@
 
       if (!data.success) {
         detailRecipeName.textContent = 'Execution details';
-        detailProductsWrap.innerHTML = `<p class="detail-empty">${data.message || 'Could not load this execution.'}</p>`;
+        detailProductsWrap.innerHTML = `<p class="detail-empty">${escHtml(data.message || 'Could not load this execution.')}</p>`;
         return;
       }
 
@@ -633,12 +633,12 @@
         const o = data.order;
         detailOrderWrap.innerHTML = `
           <div class="detail-order-card">
-            <div><strong>Order:</strong> #${o.oid}</div>
-            <div><strong>Customer:</strong> ${o.customer_name}</div>
-            <div><strong>Type:</strong> ${o.order_type || '-'}</div>
-            <div><strong>Status:</strong> ${o.pstatus || '-'}</div>
-            <div><strong>Order date:</strong> ${o.rdate || '-'}</div>
-            <div><strong>Expected/delivery date:</strong> ${o.edate || '-'}</div>
+            <div><strong>Order:</strong> #${escHtml(o.oid)}</div>
+            <div><strong>Customer:</strong> ${escHtml(o.customer_name)}</div>
+            <div><strong>Type:</strong> ${escHtml(o.order_type || '-')}</div>
+            <div><strong>Status:</strong> ${escHtml(o.pstatus || '-')}</div>
+            <div><strong>Order date:</strong> ${escHtml(o.rdate || '-')}</div>
+            <div><strong>Expected/delivery date:</strong> ${escHtml(o.edate || '-')}</div>
           </div>
         `;
         unlinkOrderBtn.style.display = 'inline-block';
@@ -653,12 +653,12 @@
       if (data.products && data.products.length > 0) {
         const rows = data.products.map(p => `
           <tr>
-            <td>${p.name}</td>
-            <td>${p.quantity}${p.uom ? ' ' + p.uom : ''}</td>
-            <td>${p.lot || '-'}</td>
-            <td>${p.location || '-'}</td>
-            <td>${p.production_date || '-'}</td>
-            <td>${p.expiration_date || '-'}</td>
+            <td>${escHtml(p.name)}</td>
+            <td>${escHtml(p.quantity)}${p.uom ? ' ' + escHtml(p.uom) : ''}</td>
+            <td>${escHtml(p.lot || '-')}</td>
+            <td>${escHtml(p.location || '-')}</td>
+            <td>${escHtml(p.production_date || '-')}</td>
+            <td>${escHtml(p.expiration_date || '-')}</td>
           </tr>
         `).join('');
         detailProductsWrap.innerHTML = `
@@ -702,10 +702,10 @@
       return;
     }
     linkOrderList.innerHTML = orders.map(o => `
-      <div class="link-order-row" data-oid="${o.oid}">
+      <div class="link-order-row" data-oid="${escHtml(o.oid)}">
         <div>
-          <div class="link-order-oid">#${o.oid} — ${o.customer_name}</div>
-          <div class="link-order-meta">${o.order_type || '-'} · ${o.pstatus || '-'} · ${o.rdate || '-'}</div>
+          <div class="link-order-oid">#${escHtml(o.oid)} — ${escHtml(o.customer_name)}</div>
+          <div class="link-order-meta">${escHtml(o.order_type || '-')} · ${escHtml(o.pstatus || '-')} · ${escHtml(o.rdate || '-')}</div>
         </div>
       </div>
     `).join('');

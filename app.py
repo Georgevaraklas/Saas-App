@@ -85,7 +85,9 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 _original_static_view = app.view_functions.get("static")
 
 # CSRF Protection Implementation
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+# Keep honouring SECRET_KEY if it is set, but never let it overwrite the
+# FLASK_SECRET_KEY above with None (which would break sessions and CSRF).
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or FLASK_SECRET_KEY
 csrf = CSRFProtect(app)
 
 
@@ -215,6 +217,8 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").lower() == "true"
 AUTH_ACCESS_COOKIE = "__Host-sb-access-token" if COOKIE_SECURE else "sb-access-token"
 AUTH_REFRESH_COOKIE = "__Host-sb-refresh-token" if COOKIE_SECURE else "sb-refresh-token"
 app.config["SESSION_COOKIE_SECURE"] = COOKIE_SECURE
+if APP_URL.startswith("https://") and not COOKIE_SECURE:
+    app.logger.warning("APP_URL is https but COOKIE_SECURE is not 'true'; auth cookies will be sent without the Secure flag. Set COOKIE_SECURE=true in production.")
 LOGO_BUCKET = "company-logos"
 PRODUCT_BUCKET = "product-images"
 
@@ -506,12 +510,35 @@ def inject_account():
     return {"account": None}
 
 
+CSP_ENFORCE = os.getenv("CSP_ENFORCE", "false").lower() == "true"
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "img-src 'self' data: blob: https://cdn-icons-png.flaticon.com",
+    "font-src 'self' data: https://cdn.jsdelivr.net",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+
+
 @app.after_request
 def after_request(response):
-    """Ensure responses aren't cached"""
+    """Ensure responses aren't cached, and add security headers"""
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Expires"] = 0
     response.headers["Pragma"] = "no-cache"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"  # frame-ancestors is ignored in report-only CSP
+    # Content-Security-Policy. Starts in report-only mode (violations show in the
+    # browser console but nothing is blocked). Set CSP_ENFORCE=true once the
+    # console is clean. 'unsafe-inline' is needed while pages use inline
+    # <script>/<style>/on*= handlers; replace with nonces to tighten later.
+    csp_header = "Content-Security-Policy" if CSP_ENFORCE else "Content-Security-Policy-Report-Only"
+    response.headers.setdefault(csp_header, CONTENT_SECURITY_POLICY)
     return response
 
 orderhistory_bp = Blueprint("orderhistory", __name__)

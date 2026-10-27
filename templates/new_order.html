@@ -336,8 +336,8 @@
     tr.setAttribute('data-sku', sku || '');
 
     tr.innerHTML = `
-      <td class="product-name">${name}</td>
-      <td class="product-sku">${sku || '-'}</td>
+      <td class="product-name">${escHtml(name)}</td>
+      <td class="product-sku">${escHtml(sku || '-')}</td>
       <td>${formatMoney(price)}</td>
       <td>
         <div class="lot-cell">

@@ -1,5 +1,6 @@
 import os
 import re
+import secrets
 
 # Vercel serverless filesystem configuration
 os.environ["TMPDIR"] = "/tmp"
@@ -511,18 +512,41 @@ def inject_account():
 
 
 CSP_ENFORCE = os.getenv("CSP_ENFORCE", "false").lower() == "true"
-CONTENT_SECURITY_POLICY = "; ".join([
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-    "img-src 'self' data: blob: https://cdn-icons-png.flaticon.com",
-    "font-src 'self' data: https://cdn.jsdelivr.net",
-    "connect-src 'self'",
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-])
+
+
+def build_csp(nonce):
+    """Content-Security-Policy for one response.
+
+    Scripts: only same-origin files, the Bootstrap CDN, and inline <script>
+    tags that carry this request's nonce (so injected markup cannot run).
+    Styles still allow 'unsafe-inline' because pages use style="" attributes,
+    which cannot be nonced; this does not allow script execution.
+    """
+    return "; ".join([
+        "default-src 'self'",
+        f"script-src 'self' 'nonce-{nonce}' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "img-src 'self' data: blob: https://cdn-icons-png.flaticon.com",
+        "font-src 'self' data: https://cdn.jsdelivr.net",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+    ])
+
+
+def get_csp_nonce():
+    """One random nonce per request, created on first use so it is the same
+    value in the rendered page and in the response header."""
+    if "csp_nonce" not in g.__dict__:
+        g.csp_nonce = secrets.token_urlsafe(16)
+    return g.csp_nonce
+
+
+@app.context_processor
+def inject_csp_nonce():
+    return {"csp_nonce": get_csp_nonce()}
 
 
 @app.after_request
@@ -533,12 +557,10 @@ def after_request(response):
     response.headers["Pragma"] = "no-cache"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"  # frame-ancestors is ignored in report-only CSP
-    # Content-Security-Policy. Starts in report-only mode (violations show in the
-    # browser console but nothing is blocked). Set CSP_ENFORCE=true once the
-    # console is clean. 'unsafe-inline' is needed while pages use inline
-    # <script>/<style>/on*= handlers; replace with nonces to tighten later.
+    # Starts in report-only mode (violations show in the browser console but
+    # nothing is blocked). Set CSP_ENFORCE=true once the console is clean.
     csp_header = "Content-Security-Policy" if CSP_ENFORCE else "Content-Security-Policy-Report-Only"
-    response.headers.setdefault(csp_header, CONTENT_SECURITY_POLICY)
+    response.headers.setdefault(csp_header, build_csp(get_csp_nonce()))
     return response
 
 orderhistory_bp = Blueprint("orderhistory", __name__)

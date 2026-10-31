@@ -266,7 +266,7 @@
   </div>
 </form>
 
-<script>
+<script nonce="{{ csp_nonce }}">
   document.addEventListener('DOMContentLoaded', function() {
     const lcTrackedSelects = document.querySelectorAll('.lc-track');
     const lcActions = document.getElementById('lcActions');

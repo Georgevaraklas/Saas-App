@@ -452,7 +452,7 @@
   </div>
 </form>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 function getCsrfToken() {
   const el = document.querySelector('input[name="csrf_token"]');
   return el ? el.value : '';

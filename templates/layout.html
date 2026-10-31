@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="/static/favicon.ico" rel="icon">
     <link href="/static/styles.css" rel="stylesheet">
-    <script>
+    <meta name="csp-nonce" content="{{ csp_nonce }}">
+    <script nonce="{{ csp_nonce }}">
+      // Nonce of this page, for scripts we generate at runtime (e.g. the invoice print window).
+      const CSP_NONCE = document.querySelector('meta[name="csp-nonce"]').content;
       // Shared HTML escaper for any client-side innerHTML / template-literal
       // rendering of user-supplied data (names, notes, addresses, OCR text...).
       // Escapes quotes as well, so it is safe in text AND quoted attributes.
@@ -675,7 +678,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
   // Sidebar navigation (click handler)
   // Listen on the whole sidebar scroll area (not just #navList) so the
   // Settings button in .sidebar-foot is covered by the same handlers.

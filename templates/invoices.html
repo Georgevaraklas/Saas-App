@@ -1652,7 +1652,7 @@
   <div class="footer">© ΤΕΦΤΕΡΙ 2026 </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 function getCsrfToken() {
   const el = document.querySelector('input[name="csrf_token"]');
   return el ? el.value : '';
@@ -1876,7 +1876,7 @@ function getCsrfToken() {
     const companyAddressHtml = COMPANY_INFO.addressLines.map(l => '<p>' + esc(l) + '</p>').join('');
     const companyAfmHtml = COMPANY_INFO.afm ? ('<p>VAT: ' + esc(COMPANY_INFO.afm) + '</p>') : '';
     const logoHtml = COMPANY_INFO.logoUrl
-    ? '<div class="logo-wrap-print"><img src="' + esc(COMPANY_INFO.logoUrl) + '" alt="' + esc(COMPANY_INFO.name) + ' logo" class="logo-img" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';"><div class="logo logo-fallback">LOGO</div></div>'
+    ? '<div class="logo-wrap-print"><img src="' + esc(COMPANY_INFO.logoUrl) + '" alt="' + esc(COMPANY_INFO.name) + ' logo" class="logo-img"><div class="logo logo-fallback">LOGO</div></div>'
     : '<div style="width:90px;height:90px;flex-shrink:0;"></div>';
 
     const customerAddressLines = [
@@ -1947,7 +1947,7 @@ function getCsrfToken() {
 </style>
 </head>
 <body>
-  <div class="print-bar"><button onclick="window.print()">Print / Save as PDF</button></div>
+  <div class="print-bar"><button id="printBtn" type="button">Print / Save as PDF</button></div>
 
   <div class="top">
     <div class="company">
@@ -1998,7 +1998,14 @@ function getCsrfToken() {
     <div class="line grand"><span>Total</span><span>${formatMoney(total)}</span></div>
   </div>
 
-  <script>
+  <script nonce="${CSP_NONCE}">
+    document.getElementById('printBtn').addEventListener('click', () => window.print());
+    // If the company logo fails to load, show the text fallback instead.
+    document.querySelectorAll('.logo-img').forEach((img) => {
+      const showFallback = () => { img.style.display = 'none'; if (img.nextElementSibling) img.nextElementSibling.style.display = 'flex'; };
+      img.addEventListener('error', showFallback);
+      if (img.complete && img.naturalWidth === 0) showFallback();
+    });
     // Auto-open the print dialog once the page has rendered; the button above
     // is a fallback for browsers that block programmatic print prompts.
     window.addEventListener('load', () => setTimeout(() => window.print(), 200));

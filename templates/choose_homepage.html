@@ -153,7 +153,7 @@
   </div>
 </form>
 
-<script>
+<script nonce="{{ csp_nonce }}">
   document.addEventListener('DOMContentLoaded', function() {
     const chTrackedSelects = document.querySelectorAll('.ch-track');
     const chActions = document.getElementById('chActions');

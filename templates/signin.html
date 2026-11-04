@@ -40,7 +40,7 @@
                   {% endif %}
                 </span>
                 <span class="flash-text">{{ message }}</span>
-                <button type="button" class="flash-close" onclick="this.parentElement.remove()">&times;</button>
+                <button type="button" class="flash-close">&times;</button>
               </div>
             {% endfor %}
           </div>
@@ -61,7 +61,7 @@
           <label for="password">Password</label>
           <div class="input-wrap">
             <input type="password" id="password" placeholder="••••••••" name="password" required>
-            <button type="button" class="toggle-pass" onclick="togglePassword('password', this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button type="button" class="toggle-pass" data-toggle-target="password"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z"/>
             <circle cx="12" cy="12" r="3"/>
             </svg></button>
@@ -82,7 +82,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
   document.getElementById("suBtn").addEventListener("click", function() {
     window.location.href = "/signup";
   });
@@ -108,6 +108,17 @@ function togglePassword(fieldId, btn){
     btn.innerHTML = eyeOpenSVG;
   }
 }
+
+// ---- Flash toast close button ----
+document.addEventListener('click', function(e) {
+  const closeBtn = e.target.closest('.flash-close');
+  if (closeBtn) closeBtn.parentElement.remove();
+});
+
+// ---- Show/hide password buttons ----
+document.querySelectorAll('.toggle-pass[data-toggle-target]').forEach(function(btn) {
+  btn.addEventListener('click', function() { togglePassword(btn.dataset.toggleTarget, btn); });
+});
 
 // ---- Flash toast auto-dismiss ----
 document.querySelectorAll('.flash-toast').forEach(function(toast, i) {

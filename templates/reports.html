@@ -818,7 +818,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 function getCsrfToken() {
   const el = document.getElementById('csrfTokenHolder');
   return el ? el.value : '';
